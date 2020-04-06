@@ -40,6 +40,7 @@ std::string AsymptoticLimits::minosAlgo_ = "stepping";
 //int         AsymptoticLimits::minimizerStrategy_  = 0;
 double AsymptoticLimits::rValue_ = 1.0;
 bool AsymptoticLimits::strictBounds_ = false;
+bool AsymptoticLimits::robustBisection_ = false;
 
 RooAbsData * AsymptoticLimits::asimovDataset_ = nullptr;
 
@@ -61,6 +62,7 @@ LimitAlgo("AsymptoticLimits specific options") {
         ("newExpected", boost::program_options::value<bool>(&newExpected_)->default_value(newExpected_), "Use the new formula for expected limits (default is true)")
         ("minosAlgo", boost::program_options::value<std::string>(&minosAlgo_)->default_value(minosAlgo_), "Algorithm to use to get the median expected limit: 'minos' (fastest), 'bisection', 'stepping' (default, most robust)")
         ("strictBounds", "Take --rMax as a strict upper bound")
+        ("robustBisection", boost::program_options::value<bool>(&robustBisection_)->default_value(robustBisection_), "Use the new formula for expected limits (default is true)")
     ;
 }
 

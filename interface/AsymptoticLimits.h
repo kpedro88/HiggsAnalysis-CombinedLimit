@@ -46,6 +46,7 @@ private:
   static std::string rule_;
   //static float       minimizerTolerance_;
   //static int         minimizerStrategy_;
+  static bool robustBisection_;
 
   static double rValue_;
 
