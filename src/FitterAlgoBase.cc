@@ -1,4 +1,5 @@
 #include "HiggsAnalysis/CombinedLimit/interface/FitterAlgoBase.h"
+#include "HiggsAnalysis/CombinedLimit/interface/RooNLLVarDebug.h"
 #include <limits>
 #include <cmath>
 
@@ -209,14 +210,14 @@ RooFitResult *FitterAlgoBase::doFit(RooAbsPdf &pdf, RooAbsData &data, RooRealVar
 
 RooFitResult *FitterAlgoBase::doFit(RooAbsPdf &pdf, RooAbsData &data, const RooArgList &rs, const RooCmdArg &constrain, bool doHesse, int ndim, bool reuseNLL, bool saveFitResult) {
     RooFitResult *ret = 0;
-    if (reuseNLL && nll.get() != 0 && !forceRecreateNLL_) {
-        ((cacheutils::CachingSimNLL&)(*nll)).setData(data); // reuse nll but swap out the data
-    } else {
+//    if (reuseNLL && nll.get() != 0 && !forceRecreateNLL_) {
+//        ((cacheutils::CachingSimNLL&)(*nll)).setData(data); // reuse nll but swap out the data
+//    } else {
         nll.reset(); // first delete the old one, to avoid using more memory, even if temporarily
-        nll.reset(pdf.createNLL(data, constrain, RooFit::Extended(pdf.canBeExtended()), RooFit::Offset(true))); // make a new nll
-    }
+        nll.reset(static_cast<RooNLLVarDebug*>(pdf.createNLL(data, constrain, RooFit::Extended(pdf.canBeExtended()), RooFit::Offset(true)))); // make a new nll
+//    }
    
-    double nll0 = nll->getVal();
+    double nll0 = static_cast<RooNLLVarDebug*>(nll.get())->getVal();
     double delta68 = 0.5*ROOT::Math::chisquared_quantile_c(1-0.68,ndim);
     double delta95 = 0.5*ROOT::Math::chisquared_quantile_c(1-0.95,ndim);
     CascadeMinimizer minim(*nll, CascadeMinimizer::Unconstrained, rs.getSize() ? dynamic_cast<RooRealVar*>(rs.first()) : 0);
@@ -233,7 +234,7 @@ RooFitResult *FitterAlgoBase::doFit(RooAbsPdf &pdf, RooAbsData &data, const RooA
        std::cout << "Minimized in : " ; tw.Print();
     }
     nll0Value_ =  nll0;
-    nllValue_ =  nll->getVal() - nll0;
+    nllValue_ =  static_cast<RooNLLVarDebug*>(nll.get())->getVal() - nll0;
     if (!ok && !keepFailures_) { std::cout << "Initial minimization failed. Aborting." << std::endl; return 0; }
     if (doHesse) minim.hesse();
     sentry.clear();
@@ -341,7 +342,7 @@ RooFitResult *FitterAlgoBase::doFit(RooAbsPdf &pdf, RooAbsData &data, const RooA
 
             std::auto_ptr<RooArgSet> allpars(nll->getParameters((const RooArgSet *)0));
 
-            double nll0 = nll->getVal();
+            double nll0 = static_cast<RooNLLVarDebug*>(nll.get())->getVal();
             double threshold68 = nll0 + delta68;
             double threshold95 = nll0 + delta95;
             // search for crossings
