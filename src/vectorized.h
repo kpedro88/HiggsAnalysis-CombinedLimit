@@ -14,7 +14,7 @@ namespace vectorized {
     void mul_inplace(const uint32_t size, double const * __restrict__ iarray, double* __restrict__ oarray) ;
 
     // nll_reduce = sum ( weights * log(pdfvals/sumCoeff) )
-    double nll_reduce(const uint32_t size, double* __restrict__ pdfvals, double const * __restrict__ weights, double sumcoeff, double *  __restrict__ workingArea) ;
+    double nll_reduce(const uint32_t size, double* __restrict__ pdfvals, double const * __restrict__ weights, double sumcoeff, double *  __restrict__ workingArea, bool debug=false) ;
 
     // gaussians
     void gaussians(const uint32_t size, double mean, double sigma, double norm, const double* __restrict__ xvals, double * __restrict__ out, double * __restrict__ workingArea, double * __restrict__ workingArea2) ;

@@ -1,6 +1,10 @@
 #include "vectorized.h"
 #include <HiggsAnalysis/CombinedLimit/interface/Accumulators.h>
 
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+
 void vectorized::mul_add(const uint32_t size, double coeff, double const * __restrict__ iarray, double* __restrict__ oarray) {
     for (uint32_t i = 0; i < size; ++i) {
         oarray[i] += coeff * iarray[i];
@@ -26,7 +30,13 @@ void vectorized::sqrt(const uint32_t size, double const * __restrict__ iarray, d
 }
 
 
-double vectorized::nll_reduce(const uint32_t size, double* __restrict__ pdfvals, double const * __restrict__ weights, double sumcoeff,  double *  __restrict__ workingArea) {
+double vectorized::nll_reduce(const uint32_t size, double* __restrict__ pdfvals, double const * __restrict__ weights, double sumcoeff,  double *  __restrict__ workingArea, bool debug) {
+    std::vector<std::stringstream> msg(size);
+   for (uint32_t i = 0; i < size; ++i) {
+        msg[i] << std::setprecision(16);
+        msg[i] << "DEBUGNLLHIST: " << i << " " << sumcoeff << " " << pdfvals[i] << " " << weights[i];
+    }
+
     double invsum = 1.0/sumcoeff;
     for (uint32_t i = 0; i < size; ++i) {
         pdfvals[i] *= invsum;
@@ -38,6 +48,12 @@ double vectorized::nll_reduce(const uint32_t size, double* __restrict__ pdfvals,
         pdfvals[i] = weights[i] * workingArea[i];
     }
 
+    std::stringstream debug_msg;
+    for (uint32_t i = 0; i < size; ++i) {
+        msg[i] << " " << pdfvals[i] << "\n";
+        debug_msg << msg[i].str();
+    }
+    if(debug) std::cout << debug_msg.str();
 
     DefaultAccumulator<double> ret = 0;
     for (uint32_t i = 0; i < size; ++i) {

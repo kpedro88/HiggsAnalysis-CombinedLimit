@@ -1,4 +1,5 @@
 #include "HiggsAnalysis/CombinedLimit/interface/MultiDimFit.h"
+#include "HiggsAnalysis/CombinedLimit/interface/CachingNLL.h"
 #include <stdexcept>
 #include <cmath>
 
@@ -194,6 +195,7 @@ bool MultiDimFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooS
         // must still create the NLL
         nll.reset(pdf.createNLL(data, constrainCmdArg, RooFit::Extended(pdf.canBeExtended()), RooFit::Offset(true)));
     }
+    static_cast<cacheutils::CachingSimNLL*>(nll.get())->setPoi(poiVars_[0]);
 
     //if(w->var("r")) {w->var("r")->Print();}
     if ( loadedSnapshot_ || res.get() || keepFailures_) {
@@ -570,7 +572,9 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
 {
     unsigned int n = poi_.size();
     //if (poi_.size() > 2) throw std::logic_error("Don't know how to do a grid with more than 2 POIs.");
+    static_cast<cacheutils::CachingSimNLL&>(nll).setDebug(true);
     double nll0 = nll.getVal();
+    static_cast<cacheutils::CachingSimNLL&>(nll).setDebug(false);
 
     if (setParametersForGrid_ != "") {
        RooArgSet allParams(w->allVars());
@@ -657,8 +661,12 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
                         true : 
                         minim.minimize(verbose-1);
             if (ok) {
-                deltaNLL_ = nll.getVal() - nll0;
-                double qN = 2*(deltaNLL_);
+                static_cast<cacheutils::CachingSimNLL&>(nll).setDebug(true);
+                double nlltmp = nll.getVal();
+                deltaNLL_ = nlltmp - nll0;
+                std::cout << "DEBUGNLLDEL: " << nlltmp << " " << nll0 << " " << deltaNLL_ << std::endl;
+                static_cast<cacheutils::CachingSimNLL&>(nll).setDebug(false);
+              double qN = 2*(deltaNLL_);
                 double prob = ROOT::Math::chisquared_cdf_c(qN, n+nOtherFloatingPoi_);
 		for(unsigned int j=0; j<specifiedNuis_.size(); j++){
 			specifiedVals_[j]=specifiedVars_[j]->getVal();

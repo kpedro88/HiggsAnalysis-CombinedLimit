@@ -5,6 +5,7 @@
 #include <RooCategory.h>
 #include <RooDataSet.h>
 #include <RooProduct.h>
+#include <TMath.h>
 
 #include "HiggsAnalysis/CombinedLimit/interface/ProfilingTools.h"
 #include <HiggsAnalysis/CombinedLimit/interface/RooMultiPdf.h>
@@ -22,6 +23,13 @@
 #include <HiggsAnalysis/CombinedLimit/interface/Accumulators.h>
 #include "HiggsAnalysis/CombinedLimit/interface/Logger.h"
 #include "vectorized.h"
+
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <algorithm>
+#include <iterator>
+#include <string>
 
 namespace cacheutils {
     typedef OptimizedCachingPdfT<FastVerticalInterpHistPdf,FastVerticalInterpHistPdfV> CachingHistPdf;
@@ -618,14 +626,18 @@ cacheutils::CachingAddNLL::evaluate() const
     double sumCoeff = 0;
     bool allBasicIntegralsOk = (basicIntegrals_ == 1);
     //std::cout << "Performing evaluation of " << GetName() << std::endl;
+    if(debug_) std::cout << std::setprecision(16);
+    if(debug_) std::cout << "DEBUGNLLCOEF: ";
     for ( ; itc != edc; ++itp, ++itc ) {
         // get coefficient
         Double_t coeff = (*itc)->getVal();
         if (isRooRealSum_ && basicIntegrals_ < 2) {
             sumCoeff += coeff * integrals_[itc - coeffs_.begin()]->getVal();
             //std::cout << "  coefficient = " << coeff << ", integral = " << integrals_[itc - coeffs_.begin()]->getVal() << std::endl;
+            if(debug_) std::cout << " " << coeff << "*" << integrals_[itc - coeffs_.begin()]->getVal();
         } else {
             sumCoeff += coeff;
+            if(debug_) std::cout << " " << coeff;
         }
         // get vals
         const std::vector<Double_t> &pdfvals = itp->eval(*data_);
@@ -644,6 +656,7 @@ cacheutils::CachingAddNLL::evaluate() const
                 }
             } else {
                 sumCoeff += coeff*(integral - 1.0); // I had added up coeff before.
+                if(debug_) std::cout << " " << coeff << "*" << (integral - 1.0);
             }
         }
 #ifdef LOG_ADDPDFS
@@ -661,11 +674,16 @@ cacheutils::CachingAddNLL::evaluate() const
         // vectorize to make it faster
         vectorized::mul_add(pdfvals.size(), coeff, &pdfvals[0], &partialSum_[0]);
     }
+    if(debug_) std::cout << std::endl;
     // if all basic integrals evaluated ok, use them
     if (allBasicIntegralsOk) basicIntegrals_ = 2;
     // then get the final nll
     static bool gentleNegativePenalty_ = runtimedef::get("GENTLE_LEE");
-    double ret = constantZeroPoint_;
+    std::vector<double> retTerms;
+    std::vector<std::string> retNames; retNames.push_back("r");
+    retNames.push_back("constantZeroPoint");
+    retTerms.push_back(constantZeroPoint_);
+    double ret = retTerms.back();
     for (its = bgs; its != eds ; ++its) {
         if (!isnormal(*its) || *its <= 0) {
             if ((weights_[its-bgs] == 0) && (*its == 0)) {
@@ -687,7 +705,9 @@ cacheutils::CachingAddNLL::evaluate() const
             if (gentleNegativePenalty_ && abs(weights_[its-bgs]) < 1e-2) {
                 std::cout << "WARNING: gentle underflow to " << *its << " in " << pdf_->GetName() << " for bin " << its-bgs << ", weight " << weights_[its-bgs] << std::endl; 
                 *its = 1.0; // skip the log
-                ret -= 25;  // add a penalty (negative since we flip 'ret' afterwards)
+                retNames.push_back("gentleNegativePenalty");
+                retTerms.push_back(-25);
+                ret += retTerms.back();  // add a penalty (negative since we flip 'ret' afterwards)
                 continue;
             }
             std::cout << "WARNING: underflow to " << *its << " in " << pdf_->GetName() << " for bin " << its-bgs << ", weight " << weights_[its-bgs] << std::endl; 
@@ -700,7 +720,9 @@ cacheutils::CachingAddNLL::evaluate() const
     //      for ( its = bgs, itw = bgw ; its != eds ; ++its, ++itw ) {
     //         ret -= (*itw) * log( ((*its) / sumCoeff) );
     //      }
-    ret -= vectorized::nll_reduce(partialSum_.size(), &partialSum_[0], &weights_[0], sumCoeff, &workingArea_[0]);
+    retNames.push_back("nll_reduce");
+    retTerms.push_back(-vectorized::nll_reduce(partialSum_.size(), &partialSum_[0], &weights_[0], sumCoeff, &workingArea_[0], debug_));
+    ret += retTerms.back();
     // std::cout << "AddNLL for " << pdf_->GetName() << ": " << ret << std::endl;
     // and add extended term: expected - observed*log(expected);
     static bool expEventsNoNorm = runtimedef::get("ADDNLL_ROOREALSUM_NONORM");
@@ -714,7 +736,10 @@ cacheutils::CachingAddNLL::evaluate() const
     // I can add any arbitrary constant that does not depend on the expected events,
     // so I choose it in order to minimize the number assuming that expectedEvents ~ sumWeights_
     //    ret += expectedEvents - sumWeights_ * log(expectedEvents);
-    ret += (expectedEvents - sumWeights_)  - sumWeights_ * (log(expectedEvents) - (sumWeights_ ? log(sumWeights_) : 0));
+    if(debug_) std::cout << "DEBUGNLLEXT: " << expectedEvents << " " << sumWeights_ << std::endl;
+    retNames.push_back("extended");
+    retTerms.push_back((expectedEvents - sumWeights_)  - sumWeights_ * (log(expectedEvents) - (sumWeights_ ? log(sumWeights_) : 0)));
+    ret += retTerms.back();
 
     // multipdfs want to add a correction factor to the NLL
     if (!multiPdfs_.empty()) {
@@ -723,11 +748,21 @@ cacheutils::CachingAddNLL::evaluate() const
             correctionFactor += itp->first->getCorrection();
         }
         // Add correction 
-        ret += correctionFactor;
+        retNames.push_back("correctionFactor");
+        retTerms.push_back(correctionFactor);
+        ret += retTerms.back();
     }
 
-    ret += zeroPoint_;
+    retNames.push_back("zeroPoint");
+    retTerms.push_back(zeroPoint_);
+    ret += retTerms.back();
 
+    std::stringstream retmsg1; retmsg1 << std::setprecision(16);
+    std::copy(retNames.begin(),retNames.end(),ostream_iterator<std::string>(retmsg1," "));
+    std::stringstream retmsg2; retmsg2 << std::setprecision(16);
+    std::copy(retTerms.begin(),retTerms.end(),ostream_iterator<double>(retmsg2," "));
+    if(debug_) std::cout << "DEBUGNLLNMS: " << retmsg1.str() << "total" << std::endl;
+    if(debug_) std::cout << "DEBUGNLLRET: " << (poi_ ? poi_->getVal() : TMath::QuietNaN()) << " " << retmsg2.str() << ret << std::endl;
     TRACE_NLL("AddNLL for " << pdf_->GetName() << ": " << ret)
     return ret;
 }

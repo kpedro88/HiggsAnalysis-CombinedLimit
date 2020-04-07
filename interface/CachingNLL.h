@@ -133,6 +133,8 @@ class CachingAddNLL : public RooAbsReal {
         /// note: setIncludeZeroWeights(true) won't have effect unless you also re-call setData
         virtual void  setIncludeZeroWeights(bool includeZeroWeights) ;
         RooSetProxy & params() { return params_; }
+        void setPoi(RooRealVar* poi) { poi_ = poi; }
+        void setDebug(bool debug) { debug_ = debug; }
     private:
         void setup_();
         void addPdfs_(RooAddPdf *addpdf, bool recursive, const RooArgList & basecoeffs) ;
@@ -153,6 +155,8 @@ class CachingAddNLL : public RooAbsReal {
         mutable int canBasicIntegrals_, basicIntegrals_;
         double zeroPoint_; 
         double constantZeroPoint_; // this is arbitrary and kept constant for all the lifetime of the PDF
+        RooRealVar* poi_ = nullptr;
+        bool debug_ = false;
 };
 
 class CachingSimNLL  : public RooAbsReal {
@@ -179,6 +183,8 @@ class CachingSimNLL  : public RooAbsReal {
         friend class CachingAddNLL;
         // trap this call, since we don't care about propagating it to the sub-components
         virtual void constOptimizeTestStatistic(ConstOpCode opcode, Bool_t doAlsoTrackingOpt=kTRUE) { }
+        void setPoi(RooRealVar* poi) { poi_ = poi; for(auto pdf : pdfs_) { pdf->setPoi(poi); } }
+        void setDebug(bool debug) { debug_ = debug; for(auto pdf : pdfs_) { pdf->setDebug(debug); } }
     private:
         void setup_();
         RooSimultaneous   *pdfOriginal_;
@@ -202,6 +208,8 @@ class CachingSimNLL  : public RooAbsReal {
         std::vector<double> constrainZeroPointsFast_;
         std::vector<double> constrainZeroPointsFastPoisson_;
         std::vector<RooAbsReal*> channelMasks_;
+        RooRealVar* poi_ = nullptr;
+        bool debug_ = false;
 };
 
 }
