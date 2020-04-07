@@ -1,5 +1,4 @@
 #include "HiggsAnalysis/CombinedLimit/interface/MultiDimFit.h"
-#include "HiggsAnalysis/CombinedLimit/interface/RooNLLVarDebug.h"
 #include <stdexcept>
 #include <cmath>
 
@@ -193,12 +192,8 @@ bool MultiDimFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooS
     } else {
         std::cout << "MultiDimFit -- Skipping initial global fit" << std::endl;
         // must still create the NLL
-        nll.reset(static_cast<RooNLLVarDebug*>(pdf.createNLL(data, constrainCmdArg, RooFit::Extended(pdf.canBeExtended()), RooFit::Offset(true))));
+        nll.reset(pdf.createNLL(data, constrainCmdArg, RooFit::Extended(pdf.canBeExtended()), RooFit::Offset(true)));
     }
-    volatile auto nllp = nll.get();
-    static_cast<RooNLLVarDebug*>(nll.get())->setPoi(poiVars_[0]);
-    volatile auto nllv = static_cast<RooNLLVarDebug*>(nll.get())->getVal();
-    std::cout << nllp << " " << nllv << std::endl;
 
     //if(w->var("r")) {w->var("r")->Print();}
     if ( loadedSnapshot_ || res.get() || keepFailures_) {
@@ -286,7 +281,7 @@ bool MultiDimFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooS
           break;
         case Singles: if (res.get()) { doSingles(*res); if (saveFitResult_) {saveResult(*res);} } break;
         case Cross: doBox(*nll, cl, "box", true); break;
-        case Grid: doGrid(w,nll.get()); break;
+        case Grid: doGrid(w,*nll); break;
         case RandomPoints: doRandomPoints(w,*nll); break;
         case FixedPoint: doFixedPoint(w,*nll); break;
         case Contour2D: doContour2D(w,*nll); break;
@@ -571,11 +566,11 @@ void MultiDimFit::doImpact(RooFitResult &res, RooAbsReal &nll) {
 }
 
 
-void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal *nll) 
+void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll) 
 {
     unsigned int n = poi_.size();
     //if (poi_.size() > 2) throw std::logic_error("Don't know how to do a grid with more than 2 POIs.");
-    double nll0 = static_cast<RooNLLVarDebug*>(nll)->getVal();
+    double nll0 = nll.getVal();
 
     if (setParametersForGrid_ != "") {
        RooArgSet allParams(w->allVars());
@@ -595,11 +590,11 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal *nll)
     }
 
 
-    CascadeMinimizer minim(*nll, CascadeMinimizer::Constrained);
+    CascadeMinimizer minim(nll, CascadeMinimizer::Constrained);
     if (!autoBoundsPOIs_.empty()) minim.setAutoBounds(&autoBoundsPOISet_); 
     if (!autoMaxPOIs_.empty()) minim.setAutoMax(&autoMaxPOISet_); 
     //minim.setStrategy(minimizerStrategy_);
-    std::auto_ptr<RooArgSet> params(nll->getParameters((const RooArgSet *)0));
+    std::auto_ptr<RooArgSet> params(nll.getParameters((const RooArgSet *)0));
     RooArgSet snap; params->snapshot(snap);
     //snap.Print("V");
     if (n == 1) {
@@ -645,9 +640,9 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal *nll)
             poiVals_[0] = x;
             poiVars_[0]->setVal(x);
             // now we minimize
-            nll->clearEvalErrorLog();
-            deltaNLL_ = static_cast<RooNLLVarDebug*>(nll)->getVal() - nll0;
-            if (nll->numEvalErrors() > 0) {
+            nll.clearEvalErrorLog();
+            deltaNLL_ = nll.getVal() - nll0;
+            if (nll.numEvalErrors() > 0) {
                 deltaNLL_ = 9990;
 		for(unsigned int j=0; j<specifiedNuis_.size(); j++){
 			specifiedVals_[j]=specifiedVars_[j]->getVal();
@@ -658,11 +653,11 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal *nll)
                 Combine::commitPoint(true, /*quantile=*/0);
                 continue;
             }
-            bool ok = fastScan_ || (hasMaxDeltaNLLForProf_ && (static_cast<RooNLLVarDebug*>(nll)->getVal() - nll0) > maxDeltaNLLForProf_) ? 
+            bool ok = fastScan_ || (hasMaxDeltaNLLForProf_ && (nll.getVal() - nll0) > maxDeltaNLLForProf_) ? 
                         true : 
                         minim.minimize(verbose-1);
             if (ok) {
-                deltaNLL_ = static_cast<RooNLLVarDebug*>(nll)->getVal() - nll0;
+                deltaNLL_ = nll.getVal() - nll0;
                 double qN = 2*(deltaNLL_);
                 double prob = ROOT::Math::chisquared_cdf_c(qN, n+nOtherFloatingPoi_);
 		for(unsigned int j=0; j<specifiedNuis_.size(); j++){
@@ -709,8 +704,8 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal *nll)
                 poiVals_[1] = y;
                 poiVars_[0]->setVal(x);
                 poiVars_[1]->setVal(y);
-                nll->clearEvalErrorLog(); static_cast<RooNLLVarDebug*>(nll)->getVal();
-                if (nll->numEvalErrors() > 0) { 
+                nll.clearEvalErrorLog(); nll.getVal();
+                if (nll.numEvalErrors() > 0) { 
 			for(unsigned int j=0; j<specifiedNuis_.size(); j++){
 				specifiedVals_[j]=specifiedVars_[j]->getVal();
 			}
@@ -743,10 +738,10 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal *nll)
                     continue;
                 }
                 // now we minimize
-                bool skipme = hasMaxDeltaNLLForProf_ && (static_cast<RooNLLVarDebug*>(nll)->getVal() - nll0) > maxDeltaNLLForProf_;
+                bool skipme = hasMaxDeltaNLLForProf_ && (nll.getVal() - nll0) > maxDeltaNLLForProf_;
                 bool ok = fastScan_ || skipme ? true :  minim.minimize(verbose-1);
                 if (ok) {
-                    deltaNLL_ = static_cast<RooNLLVarDebug*>(nll)->getVal() - nll0;
+                    deltaNLL_ = nll.getVal() - nll0;
                     double qN = 2*(deltaNLL_);
                     double prob = ROOT::Math::chisquared_cdf_c(qN, n+nOtherFloatingPoi_);
 		    for(unsigned int j=0; j<specifiedNuis_.size(); j++){
@@ -772,8 +767,8 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal *nll)
                             y = y0 + 0.33333333*j2*deltaY;
                             poiVals_[0] = x; poiVars_[0]->setVal(x);
                             poiVals_[1] = y; poiVars_[1]->setVal(y);
-                            nll->clearEvalErrorLog(); static_cast<RooNLLVarDebug*>(nll)->getVal();
-                            if (nll->numEvalErrors() > 0) { 
+                            nll.clearEvalErrorLog(); nll.getVal();
+                            if (nll.numEvalErrors() > 0) { 
 				    for(unsigned int j=0; j<specifiedNuis_.size(); j++){
 					    specifiedVals_[j]=specifiedVars_[j]->getVal();
 				    }
@@ -786,10 +781,10 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal *nll)
                                 deltaNLL_ = 9999; Combine::commitPoint(true, /*quantile=*/0); 
                                 continue;
                             }
-                            deltaNLL_ = static_cast<RooNLLVarDebug*>(nll)->getVal() - nll0;
+                            deltaNLL_ = nll.getVal() - nll0;
                             if (forceProfile || (!fastScan_ && std::min(fabs(deltaNLL_ - 1.15), fabs(deltaNLL_ - 2.995)) < 0.5)) {
                                 minim.minimize(verbose-1);
-                                deltaNLL_ = static_cast<RooNLLVarDebug*>(nll)->getVal() - nll0;
+                                deltaNLL_ = nll.getVal() - nll0;
                             }
                             double qN = 2*(deltaNLL_);
                             double prob = ROOT::Math::chisquared_cdf_c(qN, n+nOtherFloatingPoi_);
@@ -858,8 +853,8 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal *nll)
 	  }
 	  if (verbose && (ipoint % nprint == 0)) fprintf(sentry.trueStdOut(), "\n");
 
-          nll->clearEvalErrorLog(); static_cast<RooNLLVarDebug*>(nll)->getVal();
-          if (nll->numEvalErrors() > 0) { 
+          nll.clearEvalErrorLog(); nll.getVal();
+          if (nll.numEvalErrors() > 0) { 
 		for(unsigned int j=0; j<specifiedNuis_.size(); j++){
 			specifiedVals_[j]=specifiedVars_[j]->getVal();
 		}
@@ -874,10 +869,10 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal *nll)
 	       continue;
 	  }
           // now we minimize
-          bool skipme = hasMaxDeltaNLLForProf_ && (static_cast<RooNLLVarDebug*>(nll)->getVal() - nll0) > maxDeltaNLLForProf_;
+          bool skipme = hasMaxDeltaNLLForProf_ && (nll.getVal() - nll0) > maxDeltaNLLForProf_;
           bool ok = fastScan_ || skipme ? true :  minim.minimize(verbose-1);
           if (ok) {
-               deltaNLL_ = static_cast<RooNLLVarDebug*>(nll)->getVal() - nll0;
+               deltaNLL_ = nll.getVal() - nll0;
                double qN = 2*(deltaNLL_);
                double prob = ROOT::Math::chisquared_cdf_c(qN, n+nOtherFloatingPoi_);
 		for(unsigned int j=0; j<specifiedNuis_.size(); j++){
