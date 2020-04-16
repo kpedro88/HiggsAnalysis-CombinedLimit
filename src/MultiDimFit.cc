@@ -678,6 +678,12 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
 			specifiedCatVals_[j]=specifiedCat_[j]->getIndex();
 		}
                 Combine::commitPoint(true, /*quantile=*/prob);
+                //prev line updates the map
+                std::stringstream msg;
+                for(const auto& par: Combine::trackedParametersMap_){
+                    msg << par.first->GetName() << " " << par.second << " ";
+                }
+                std::cout << "DEBUGNLLPAR: " << msg.str() << std::endl;
             }
         }
     } else if (n == 2) {
