@@ -59,7 +59,7 @@ for ich,fname in enumerate(args):
         b_in  = label if singlebin else b
         if isVetoed(b_in,options.channelVetos): continue
         if not isIncluded(b_in,options.channelIncludes): continue
-        obskeyline.append(bout)
+        if bout not in obskeyline: obskeyline.append(bout)
         for (p,e) in DC.exp[b].items(): # so that we get only self.DC.processes contributing to this bin
             if DC.isSignal[p] == False: continue
             #print "in DC.exp.items:b,p", b,p
@@ -160,7 +160,8 @@ for ich,fname in enumerate(args):
             shapeLines.append(('*',bout,['FAKE']))
     # combine observations, but remove line if any of the datacards doesn't have it
     if len(DC.obs) == 0:
-        obsline = None
+        if all(b in obskeyline for b in DC.bins): pass
+        else: obsline = None
     elif obsline != None:
         for b in DC.bins:
             bout = label if singlebin else label+b
