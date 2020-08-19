@@ -123,6 +123,7 @@
 	<class name="RooCPSHighMassVBF" />
 	<class name="RooCPSHighMassVBFNoInterf" />
 	<class name="RooChebyshevPDF" />
+    <class name="RooDijetBinPdf" /> 
 	<class name="RooDoubleCB" />
 	<class name="RooDoubleCrystalBall" />
 	<class name="RooErfExpPdf" />

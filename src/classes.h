@@ -19,6 +19,7 @@
 #include "HiggsAnalysis/CombinedLimit/interface/HZGRooPdfs.h"
 #include "HiggsAnalysis/CombinedLimit/interface/SequentialMinimizer.h"
 #include "HiggsAnalysis/CombinedLimit/interface/ProcessNormalization.h"
+#include "HiggsAnalysis/CombinedLimit/interface/RooDijetBinPdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooRealFlooredSumPdf.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooSpline1D.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RooSplineND.h"
