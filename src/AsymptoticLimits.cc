@@ -256,6 +256,7 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
         }
         limitErr = 0.5*(rMax - rMin);
     } else {
+        if (verbose > 0) std::cout << "[runLimit] rMin = " << rMin << ", rMax = " << rMax << std::endl;
         limit = 0.5*(rMin + rMax); 
         limitErr = 0.5*(rMax - rMin);
     }
@@ -283,7 +284,7 @@ double AsymptoticLimits::getCLs(RooRealVar &r, double rVal, bool getAlsoExpected
   if (!strictBounds_) r.setMax(1.1 * rVal);
   r.setConstant(true);
 
-  CloseCoutSentry sentry(verbose < 3);
+//  CloseCoutSentry sentry(verbose < 3);
 
   CascadeMinimizer minimD(*nllD_, CascadeMinimizer::Constrained, &r);
   //minimD.setStrategy(minimizerStrategy_);  
@@ -332,6 +333,8 @@ double AsymptoticLimits::getCLs(RooRealVar &r, double rVal, bool getAlsoExpected
   }
   double qA  = 2*(nllA_->getVal() - minNllA_); if (qA < 0) qA = 0;
 
+  if (verbose > 0) std::cout << "[getCLs] nllD = " << nllD_->getVal() << ", minNllD = " << minNllD_ << ", nllA = " << nllA_->getVal() << ", minNllA = " << minNllA_ << std::endl;
+
   double CLsb = ROOT::Math::normal_cdf_c(sqrt(qmu));
   double CLb  = ROOT::Math::normal_cdf(sqrt(qA)-sqrt(qmu));
   if (qtilde_ && qmu > qA) {
@@ -341,7 +344,7 @@ double AsymptoticLimits::getCLs(RooRealVar &r, double rVal, bool getAlsoExpected
     CLb  = ROOT::Math::normal_cdf_c( (qmu - qA)/(2*mos) );
   }
   double CLs  = (CLb == 0 ? 0 : CLsb/CLb);
-  sentry.clear();
+//  sentry.clear();
   if (verbose > 0) {
   	printf("At %s = %f:\tq_mu = %.5f\tq_A  = %.5f\tCLsb = %7.5f\tCLb  = %7.5f\tCLs  = %7.5f\n", r.GetName(), rVal, qmu, qA, CLsb, CLb, CLs);
   	Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- At %s = %f:\tq_mu = %.5f\tq_A  = %.5f\tCLsb = %7.5f\tCLb  = %7.5f\tCLs  = %7.5f",__LINE__,r.GetName(), rVal, qmu, qA, CLsb, CLb, CLs)),Logger::kLogLevelInfo,__func__);
