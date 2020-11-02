@@ -194,6 +194,8 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
   }
   double rErr = std::max<double>(r->getError(), 0.02 * (r->getMax() - r->getMin()));
 
+  //reset r value after global data fit
+  r->setVal(0.1*r->getMax());
   r->setMin(0);
 
   if (verbose > 1) fitFreeD_.Print("V");
