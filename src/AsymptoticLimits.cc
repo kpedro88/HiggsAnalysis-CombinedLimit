@@ -229,10 +229,11 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
   double clsMax = 1, clsMin = 0;
   for (int tries = 0; tries < 5; ++tries) {
     double cls = getCLs(*r, rMax);
+    if (verbose > 0) std::cout << "[runLimit] tries = " << tries << ", cls = " << cls << ", " << r->GetName() << " = " << r->getVal() << ", rMax = " << rMax << std::endl;
     if (cls == -999) { 
-    	std::cerr << "Minimization failed in an unrecoverable way" << std::endl;
-    	if (verbose>0)  Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- Minimization failed in an unrecoverable way for calculation of limit",__LINE__)),Logger::kLogLevelError,__func__);
-	break; 
+        std::cerr << "Minimization failed in an unrecoverable way" << std::endl;
+        if (verbose>0)  Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- Minimization failed in an unrecoverable way for calculation of limit",__LINE__)),Logger::kLogLevelError,__func__);
+        break; 
     }
     if (cls < clsTarget) { clsMin = cls; break; }
     if (strictBounds_ && rMax == r->getMax()) {
@@ -244,8 +245,10 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
   }
   
   do {
+    if (verbose > 0) std::cout << "[runLimit] do while: clsTarget = " << clsTarget << ", clsMin = " << clsMin << ", clsMax = " << clsMax << std::endl;
     if (clsMax < 3*clsTarget && clsMin > 0.3*clsTarget) {
         double rCross = rMin + (rMax-rMin)*log(clsMax/clsTarget)/log(clsMax/clsMin);
+        if (verbose > 0) std::cout << "[runLimit] rCross = " << rCross << ", rMin = " << rMin << ", rMax = " << rMax << std::endl;
         if ((rCross-rMin) < (rMax - rCross)) {
             limit = 0.8*rCross + 0.2*rMax;
         } else {
@@ -257,10 +260,11 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
         limitErr = 0.5*(rMax - rMin);
     }
     double cls = getCLs(*r, limit);
+    if (verbose > 0) std::cout << "[runLimit] cls = " << cls << ", limit = " << limit << ", limitErr = " << limitErr << std::endl;
     if (cls == -999) { 
-    	std::cerr << "Minimization failed in an unrecoverable way" << std::endl; 
-	if (verbose>0)  Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- Minimization failed in an unrecoverable way for calculation of limit",__LINE__)),Logger::kLogLevelError,__func__);
-	break; 
+        std::cerr << "Minimization failed in an unrecoverable way" << std::endl;
+        if (verbose>0)  Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- Minimization failed in an unrecoverable way for calculation of limit",__LINE__)),Logger::kLogLevelError,__func__);
+        break;
     }
     if (cls > clsTarget) {
         clsMax = cls;
