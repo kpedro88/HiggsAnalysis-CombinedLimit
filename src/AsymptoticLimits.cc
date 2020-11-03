@@ -244,8 +244,10 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
         return true;
     }
     rMax *= 2;
+    if (verbose > 0) std::cout << std::endl;
   }
-  
+  if (verbose > 0) std::cout << std::endl;
+
   do {
     if (verbose > 0) std::cout << "[runLimit] do while: clsTarget = " << clsTarget << ", clsMin = " << clsMin << ", clsMax = " << clsMax << std::endl;
     if (clsMax < 3*clsTarget && clsMin > 0.3*clsTarget) {
@@ -276,6 +278,7 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
         clsMin = cls;
         rMax = limit;
     }
+    if (verbose > 0) std::cout << std::endl;
   } while (limitErr > std::max(rRelAccuracy_ * limit, rAbsAccuracy_));
 
   return true;
@@ -316,7 +319,6 @@ double AsymptoticLimits::getCLs(RooRealVar &r, double rVal, bool getAlsoExpected
     }
     qmu = 0.;
   }
-
 
   CascadeMinimizer minimA(*nllA_, CascadeMinimizer::Constrained, &r);
   //minimA.setStrategy(minimizerStrategy_); 
