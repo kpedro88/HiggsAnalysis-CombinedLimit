@@ -308,7 +308,8 @@ double AsymptoticLimits::getCLs(RooRealVar &r, double rVal, bool getAlsoExpected
       fitFixD_.readFrom(*params_);
       if (verbose >= 2) fitFixD_.Print("V");
   }
-  double qmu = 2*(nllD_->getVal() - minNllD_); if (qmu < 0) qmu = 0;
+  double nllD_val = nllD_->getVal();
+  double qmu = 2*(nllD_val - minNllD_); if (qmu < 0) qmu = 0;
   // qmu is zero when mu < mu^ (CMS NOTE-2011/005)
   // --> prevents us excluding from below
   if (what_ == "singlePoint" && rVal < rBestD_) {
@@ -336,17 +337,20 @@ double AsymptoticLimits::getCLs(RooRealVar &r, double rVal, bool getAlsoExpected
       fitFixA_.readFrom(*params_);
       if (verbose >= 2) fitFixA_.Print("V");
   }
-  double qA  = 2*(nllA_->getVal() - minNllA_); if (qA < 0) qA = 0;
+  double nllA_val = nllA_->getVal();
+  double qA  = 2*(nllA_val - minNllA_); if (qA < 0) qA = 0;
 
-  if (verbose > 0) std::cout << "[getCLs] nllD = " << nllD_->getVal() << ", minNllD = " << minNllD_ << ", nllA = " << nllA_->getVal() << ", minNllA = " << minNllA_ << std::endl;
+  if (verbose > 0) std::cout << "[getCLs] nllD = " << nllD_val << ", minNllD = " << minNllD_ << ", nllA = " << nllA_val << ", minNllA = " << minNllA_ << std::endl;
 
   double CLsb = ROOT::Math::normal_cdf_c(sqrt(qmu));
   double CLb  = ROOT::Math::normal_cdf(sqrt(qA)-sqrt(qmu));
+  if (verbose > 0) std::cout << "[getCLs] original: CLsb = " << CLsb << ", CLb = " << CLb << std::endl;
   if (qtilde_ && qmu > qA) {
     // In this region, things are tricky
     double mos = sqrt(qA); // mu/sigma
     CLsb = ROOT::Math::normal_cdf_c( (qmu + qA)/(2*mos) );
     CLb  = ROOT::Math::normal_cdf_c( (qmu - qA)/(2*mos) );
+    if (verbose > 0) std::cout << "[getCLs] modified: CLsb = " << CLsb << ", CLb = " << CLb << std::endl;
   }
   double CLs  = (CLb == 0 ? 0 : CLsb/CLb);
   if(verbose==0) sentry.clear();
