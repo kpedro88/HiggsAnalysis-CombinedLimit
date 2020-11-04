@@ -288,40 +288,46 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
       if (verbose > 0) std::cout << std::endl;
     }
     if (verbose > 0) std::cout << std::endl;
-  } while (improveFalseMinima and (!foundBestMinimumD_ or !foundBestMinimumA_));
+    if (improveFalseMinima and  (!foundBestMinimumD_ or !foundBestMinimumA_)) continue;
 
-  do {
-    if (verbose > 0) std::cout << "[runLimit] do while: clsTarget = " << clsTarget << ", clsMin = " << clsMin << ", clsMax = " << clsMax << std::endl;
-    if (clsMax < 3*clsTarget && clsMin > 0.3*clsTarget) {
-        double rCross = rMin + (rMax-rMin)*log(clsMax/clsTarget)/log(clsMax/clsMin);
-        if (verbose > 0) std::cout << "[runLimit] rCross = " << rCross << ", rMin = " << rMin << ", rMax = " << rMax << std::endl;
-        if ((rCross-rMin) < (rMax - rCross)) {
-            limit = 0.8*rCross + 0.2*rMax;
-        } else {
-            limit = 0.8*rCross + 0.2*rMin;
-        }
-        limitErr = 0.5*(rMax - rMin);
-    } else {
-        if (verbose > 0) std::cout << "[runLimit] rMin = " << rMin << ", rMax = " << rMax << std::endl;
-        limit = 0.5*(rMin + rMax); 
-        limitErr = 0.5*(rMax - rMin);
-    }
-    double cls = getCLs(*r, limit);
-    if (verbose > 0) std::cout << "[runLimit] cls = " << cls << ", limit = " << limit << ", limitErr = " << limitErr << std::endl;
-    if (cls == -999) { 
-        std::cerr << "Minimization failed in an unrecoverable way" << std::endl;
-        if (verbose>0)  Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- Minimization failed in an unrecoverable way for calculation of limit",__LINE__)),Logger::kLogLevelError,__func__);
-        break;
-    }
-    if (cls > clsTarget) {
-        clsMax = cls;
-        rMin = limit;
-    } else {
-        clsMin = cls;
-        rMax = limit;
-    }
-    if (verbose > 0) std::cout << std::endl;
-  } while (limitErr > std::max(rRelAccuracy_ * limit, rAbsAccuracy_));
+    do {
+      if (verbose > 0) std::cout << "[runLimit] do while: clsTarget = " << clsTarget << ", clsMin = " << clsMin << ", clsMax = " << clsMax << std::endl;
+      if (clsMax < 3*clsTarget && clsMin > 0.3*clsTarget) {
+          double rCross = rMin + (rMax-rMin)*log(clsMax/clsTarget)/log(clsMax/clsMin);
+          if (verbose > 0) std::cout << "[runLimit] rCross = " << rCross << ", rMin = " << rMin << ", rMax = " << rMax << std::endl;
+          if ((rCross-rMin) < (rMax - rCross)) {
+              limit = 0.8*rCross + 0.2*rMax;
+          } else {
+              limit = 0.8*rCross + 0.2*rMin;
+          }
+          limitErr = 0.5*(rMax - rMin);
+      } else {
+          if (verbose > 0) std::cout << "[runLimit] rMin = " << rMin << ", rMax = " << rMax << std::endl;
+          limit = 0.5*(rMin + rMax); 
+          limitErr = 0.5*(rMax - rMin);
+      }
+      double cls = getCLs(*r, limit);
+      if (verbose > 0) std::cout << "[runLimit] cls = " << cls << ", limit = " << limit << ", limitErr = " << limitErr << std::endl;
+      if (cls == -999) { 
+          std::cerr << "Minimization failed in an unrecoverable way" << std::endl;
+          if (verbose>0)  Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- Minimization failed in an unrecoverable way for calculation of limit",__LINE__)),Logger::kLogLevelError,__func__);
+          break;
+      }
+      else if (improveFalseMinima and  (!foundBestMinimumD_ or !foundBestMinimumA_)) {
+          if(verbose>0) std::cout << "[runLimit] restarting to find better minima for " << (foundBestMinimumD_ ? " " : "data") << (foundBestMinimumA_ ? " " : "asimov") << std::endl;
+          break;
+      }
+
+      if (cls > clsTarget) {
+          clsMax = cls;
+          rMin = limit;
+      } else {
+          clsMin = cls;
+          rMax = limit;
+      }
+      if (verbose > 0) std::cout << std::endl;
+    } while (limitErr > std::max(rRelAccuracy_ * limit, rAbsAccuracy_));
+  } while (improveFalseMinima and (!foundBestMinimumD_ or !foundBestMinimumA_));
 
   return true;
 }
