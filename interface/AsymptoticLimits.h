@@ -68,13 +68,16 @@ private:
 
   RooAbsData *asimovDataset(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooStats::ModelConfig *mc_b, RooAbsData &data);
   double getCLs(RooRealVar &r, double rVal, bool getAlsoExpected=false, double *limit=0, double *limitErr=0);
+  double findGlobalMinData(RooRealVar *r, double rStart, double rMin);
+  void findGlobalMinAsimov(RooRealVar *r, double rStart, double rMin);
   
   TFile *gridFile_;
   TTree *limitsTree_;
   double readCL_;
   double readMU_;
   bool doCLs_; 
-
+  bool foundBestMinimumD_;
+  bool foundBestMinimumA_;
 };
 
 #endif

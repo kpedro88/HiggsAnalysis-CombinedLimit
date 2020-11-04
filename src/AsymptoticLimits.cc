@@ -19,6 +19,7 @@
 #include "HiggsAnalysis/CombinedLimit/interface/utils.h"
 #include "HiggsAnalysis/CombinedLimit/interface/AsimovUtils.h"
 #include "HiggsAnalysis/CombinedLimit/interface/Logger.h"
+#include "HiggsAnalysis/CombinedLimit/interface/ProfilingTools.h"
 
 #include <boost/bind.hpp>
 
@@ -141,6 +142,57 @@ bool AsymptoticLimits::run(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooStat
     return ret;
 }
 
+double AsymptoticLimits::findGlobalMinData(RooRealVar *r, double rStart, double rMin) {
+  r->setConstant(false);
+  r->setVal(rStart);
+  r->setMin(rMin);
+
+  if (verbose > 0) std::cout << "\nMake global fit of real data" << std::endl;
+  {
+    CloseCoutSentry sentry(verbose < 3);
+    *params_ = snapGlobalObsData;
+    CascadeMinimizer minim(*nllD_, CascadeMinimizer::Unconstrained, r);
+    //minim.setStrategy(minimizerStrategy_);
+    minim.minimize(verbose-2);
+    fitFreeD_.readFrom(*params_);
+    minNllD_ = nllD_->getVal();
+  }
+  rBestD_ = r->getVal();
+  if (verbose > 0) {
+   std::cout << "NLL at global minimum of data: " << minNllD_ << " (" << r->GetName() << " = " << r->getVal() << ")" << std::endl;
+       Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- NLL at global minimum of data = %g (%s=%g)",__LINE__,minNllD_,r->GetName(),r->getVal())),Logger::kLogLevelInfo,__func__);
+  }
+  double rErr = std::max<double>(r->getError(), 0.02 * (r->getMax() - r->getMin()));
+
+  r->setConstant(true);
+
+  return rErr;
+}
+
+void AsymptoticLimits::findGlobalMinAsimov(RooRealVar *r, double rStart, double rMin) {
+  //reset r value
+  r->setConstant(false);
+  r->setVal(rStart);
+  r->setMin(rMin);
+
+  if (verbose > 0) std::cout << "\nMake global fit of asimov data" << std::endl;
+  {
+    CloseCoutSentry sentry(verbose < 3);
+    *params_ = snapGlobalObsAsimov;
+    CascadeMinimizer minim(*nllA_, CascadeMinimizer::Unconstrained, r);
+    //minim.setStrategy(minimizerStrategy_);
+    minim.minimize(verbose-2);
+    fitFreeA_.readFrom(*params_);
+    minNllA_ = nllA_->getVal();
+  }
+  if (verbose > 0) {
+  	std::cout << "NLL at global minimum of asimov: " << minNllA_ << " (" << r->GetName() << " = " << r->getVal() << ")" << std::endl;
+    	Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- NLL at global minimum of asimov = %g (%s=%g)",__LINE__,minNllA_,r->GetName(),r->getVal())),Logger::kLogLevelInfo,__func__);
+  }
+
+  r->setConstant(true);
+}
+
 bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooStats::ModelConfig *mc_b, RooAbsData &data, double &limit, double &limitErr, const double *hint) {
   RooRealVar *r = dynamic_cast<RooRealVar *>(mc_s->GetParametersOfInterest()->first());
 
@@ -152,15 +204,16 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
 	limitErr=0;
 	return true;
   }
-   
+
   w->loadSnapshot("clean");
   RooAbsData &asimov = *asimovDataset(w, mc_s, mc_b, data);
   w->loadSnapshot("clean");
   
+  //apparently these lines change the values from createNLL()
   r->setConstant(false);
   r->setVal(0.1*r->getMax());
   r->setMin(qtilde_ ? 0 : -r->getMax());
- 
+   
   if (params_.get() == 0) params_.reset(mc_s->GetPdf()->getParameters(data));
 
   hasFloatParams_ = false;
@@ -177,47 +230,14 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
   if (verbose > 0) std::cout << (qtilde_ ? "Restricting" : "Not restricting") << " " << r->GetName() << " to positive values." << std::endl;
   if (verbose > 1) params_->Print("V");
  
-  if (verbose > 0) std::cout << "\nMake global fit of real data" << std::endl;
-  {
-    CloseCoutSentry sentry(verbose < 3);
-    *params_ = snapGlobalObsData;
-    CascadeMinimizer minim(*nllD_, CascadeMinimizer::Unconstrained, r);
-    //minim.setStrategy(minimizerStrategy_);
-    minim.minimize(verbose-2);
-    fitFreeD_.readFrom(*params_);
-    minNllD_ = nllD_->getVal();
-  }
-  rBestD_ = r->getVal();
-  if (verbose > 0) {
-  	std::cout << "NLL at global minimum of data: " << minNllD_ << " (" << r->GetName() << " = " << r->getVal() << ")" << std::endl;
-    	Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- NLL at global minimum of data = %g (%s=%g)",__LINE__,minNllD_,r->GetName(),r->getVal())),Logger::kLogLevelInfo,__func__);
-  }
-  double rErr = std::max<double>(r->getError(), 0.02 * (r->getMax() - r->getMin()));
-
-  //reset r value after global data fit
-  r->setVal(0.1*r->getMax());
-  r->setMin(0);
-
+  double rMax_orig = r->getMax();
+  double rErr = findGlobalMinData(r, 0.1*rMax_orig, qtilde_ ? 0 : -rMax_orig);
   if (verbose > 1) fitFreeD_.Print("V");
-  if (verbose > 0) std::cout << "\nMake global fit of asimov data" << std::endl;
-  {
-    CloseCoutSentry sentry(verbose < 3);
-    *params_ = snapGlobalObsAsimov;
-    CascadeMinimizer minim(*nllA_, CascadeMinimizer::Unconstrained, r);
-    //minim.setStrategy(minimizerStrategy_);
-    minim.minimize(verbose-2);
-    fitFreeA_.readFrom(*params_);
-    minNllA_ = nllA_->getVal();
-    sentry.clear();
-  }
-  if (verbose > 0) {
-  	std::cout << "NLL at global minimum of asimov: " << minNllA_ << " (" << r->GetName() << " = " << r->getVal() << ")" << std::endl;
-    	Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- NLL at global minimum of asimov = %g (%s=%g)",__LINE__,minNllA_,r->GetName(),r->getVal())),Logger::kLogLevelInfo,__func__);
-  }
+
+  findGlobalMinAsimov(r, 0.1*rMax_orig, 0);
   if (verbose > 1) fitFreeA_.Print("V");
 
   fitFreeD_.writeTo(*params_);
-  r->setConstant(true);
 
   if (what_ == "singlePoint") {
     Combine::addBranch("r",&rValue_,"r/D");
@@ -225,28 +245,50 @@ bool AsymptoticLimits::runLimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, Ro
     return true;
   }
 
+  const bool improveFalseMinima = runtimedef::get(std::string("improveFalseMinima"));
+  foundBestMinimumD_ = true;
+  foundBestMinimumA_ = true;
   double clsTarget = 1-cl;
-  double rMin = std::max<double>(0, r->getVal()), rMax = rMin + 3 * rErr;
-  if (strictBounds_ && rMax > r->getMax()) rMax = r->getMax();
-  double clsMax = 1, clsMin = 0;
-  for (int tries = 0; tries < 5; ++tries) {
-    double cls = getCLs(*r, rMax);
-    if (verbose > 0) std::cout << "[runLimit] tries = " << tries << ", cls = " << cls << ", " << r->GetName() << " = " << r->getVal() << ", rMax = " << rMax << std::endl;
-    if (cls == -999) { 
-        std::cerr << "Minimization failed in an unrecoverable way" << std::endl;
-        if (verbose>0)  Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- Minimization failed in an unrecoverable way for calculation of limit",__LINE__)),Logger::kLogLevelError,__func__);
-        break; 
+  double rMin, rMax;
+  double clsMin, clsMax;
+
+  do {
+    if (improveFalseMinima) {
+      //start at new rMax from 'tries' loop below, where better minimum was found
+      if (!foundBestMinimumD_) rErr = findGlobalMinData(r, rMax, qtilde_ ? 0 : -rMax_orig);
+      if (!foundBestMinimumA_) findGlobalMinAsimov(r, rMax, 0);
     }
-    if (cls < clsTarget) { clsMin = cls; break; }
-    if (strictBounds_ && rMax == r->getMax()) {
-        std::cout << rule_ << " at upper bound " << r->GetName() << " = " << r->getVal() << " is " << cls << ". Stopping search and using that as a limit.\n" << std::endl; 
-        limit = rMax; limitErr = -1.0;
-        return true;
+
+    rMin = std::max<double>(0, r->getVal());
+    rMax = rMin + 3 * rErr;
+    if (strictBounds_ && rMax > r->getMax()) rMax = r->getMax();
+    if (verbose > 0) std::cout << "[runLimit] starting tries; r = " << r->getVal() << ", rErr = " << rErr << ", rMin = " << rMin << ", rMax = " << rMax << std::endl;
+    clsMax = 1;
+    clsMin = 0;
+    for (int tries = 0; tries < 5; ++tries) {
+      double cls = getCLs(*r, rMax);
+      if (verbose > 0) std::cout << "[runLimit] tries = " << tries << ", cls = " << cls << ", " << r->GetName() << " = " << r->getVal() << ", rMax = " << rMax << std::endl;
+      if (cls == -999) { 
+          std::cerr << "Minimization failed in an unrecoverable way" << std::endl;
+          if (verbose>0)  Logger::instance().log(std::string(Form("AsymptoticLimits.cc: %d -- Minimization failed in an unrecoverable way for calculation of limit",__LINE__)),Logger::kLogLevelError,__func__);
+          break; 
+      }
+      else if (improveFalseMinima and  (!foundBestMinimumD_ or !foundBestMinimumA_)) {
+          if(verbose>0) std::cout << "[runLimit] restarting to find better minima for " << (foundBestMinimumD_ ? " " : "data") << (foundBestMinimumA_ ? " " : "asimov") << std::endl;
+          break;
+      }
+
+      if (cls < clsTarget) { clsMin = cls; break; }
+      if (strictBounds_ && rMax == r->getMax()) {
+          std::cout << rule_ << " at upper bound " << r->GetName() << " = " << r->getVal() << " is " << cls << ". Stopping search and using that as a limit.\n" << std::endl; 
+          limit = rMax; limitErr = -1.0;
+          return true;
+      }
+      rMax *= 2;
+      if (verbose > 0) std::cout << std::endl;
     }
-    rMax *= 2;
     if (verbose > 0) std::cout << std::endl;
-  }
-  if (verbose > 0) std::cout << std::endl;
+  } while (improveFalseMinima and (!foundBestMinimumD_ or !foundBestMinimumA_));
 
   do {
     if (verbose > 0) std::cout << "[runLimit] do while: clsTarget = " << clsTarget << ", clsMin = " << clsMin << ", clsMax = " << clsMax << std::endl;
@@ -309,7 +351,12 @@ double AsymptoticLimits::getCLs(RooRealVar &r, double rVal, bool getAlsoExpected
       if (verbose >= 2) fitFixD_.Print("V");
   }
   double nllD_val = nllD_->getVal();
-  double qmu = 2*(nllD_val - minNllD_); if (qmu < 0) qmu = 0;
+  double qmu = 2*(nllD_val - minNllD_);
+  if (qmu < 0) {
+    qmu = 0;
+    foundBestMinimumD_ = false;
+  }
+  else foundBestMinimumD_ = true;
   // qmu is zero when mu < mu^ (CMS NOTE-2011/005)
   // --> prevents us excluding from below
   if (what_ == "singlePoint" && rVal < rBestD_) {
@@ -338,7 +385,12 @@ double AsymptoticLimits::getCLs(RooRealVar &r, double rVal, bool getAlsoExpected
       if (verbose >= 2) fitFixA_.Print("V");
   }
   double nllA_val = nllA_->getVal();
-  double qA  = 2*(nllA_val - minNllA_); if (qA < 0) qA = 0;
+  double qA  = 2*(nllA_val - minNllA_);
+  if (qA < 0){
+    qA = 0;
+    foundBestMinimumA_ = false;
+  }
+  else foundBestMinimumA_ = true;
 
   if (verbose > 0) std::cout << "[getCLs] nllD = " << nllD_val << ", minNllD = " << minNllD_ << ", nllA = " << nllA_val << ", minNllA = " << minNllA_ << std::endl;
 
