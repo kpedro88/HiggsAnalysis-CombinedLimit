@@ -601,7 +601,7 @@ float AsymptoticLimits::findExpectedLimitFromCrossing(RooAbsReal &nll, RooRealVa
         }
         double rCross = 0.5*(rMin+rMax);
         if(allowRobustBisection1){
-            std::cout << "[findExpectedLimitFromCrossing] WARNING : Increasing the range of rMin, rMax to help ensure the desired value is inside the range." << std::endl;
+            if (verbose > 0) std::cout << "[findExpectedLimitFromCrossing] WARNING : Increasing the range of rMin, rMax to help ensure the desired value is inside the range." << std::endl;
             rMax = rMax * 2;
             rMin = rMin / 2.;
         }
@@ -625,7 +625,7 @@ float AsymptoticLimits::findExpectedLimitFromCrossing(RooAbsReal &nll, RooRealVa
             while (rErr > std::max(rRelAccuracy_*rCross, rAbsAccuracy_)) {
                 if (verbose > 0) std::cout << "[findExpectedLimitFromCrossing] DEBUG : r = " << r->getVal() << " +/- " << (r->getMax() - r->getMin()) / 2. << std::endl;
                 if (!strictBounds_ && rCross >= r->getMax()){
-                    std::cout << "[findExpectedLimitFromCrossing] DEBUG : Increasing rMax to " << rCross * 1.1 << std::endl;
+                    if (verbose > 0) std::cout << "[findExpectedLimitFromCrossing] DEBUG : Increasing rMax to " << rCross * 1.1 << std::endl;
                     r->setMax(rCross*1.1);
                 }
 
@@ -703,8 +703,8 @@ float AsymptoticLimits::findExpectedLimitFromCrossing(RooAbsReal &nll, RooRealVa
                 }
                 if (verbose > 1) printf("At %s = %f:\tdelta(nll) = %.5f\n", r->GetName(), rCross, here-nll0);
                 if (fabs(here - threshold) < 0.05*minim2.tolerance()) {
-                    if (verbose > 0) {
-                        std::cout << "[findExpectedLimitFromCrossing] DEBUG : here - threshold < 0.05*minimizerTolerance_. Breaking." << std::endl;
+                    if (verbose > 0) std::cout << "[findExpectedLimitFromCrossing] DEBUG : here - threshold < 0.05*minimizerTolerance_. Breaking." << std::endl;
+                    if (verbose > 1) {
                         std::cout << "[findExpectedLimitFromCrossing] DEBUG : Printing fit result (rCross=" << rCross << ")" << std::endl;
                         std::unique_ptr<RooFitResult> res2(minim2.save());
                         res2->Print("V");
@@ -715,43 +715,47 @@ float AsymptoticLimits::findExpectedLimitFromCrossing(RooAbsReal &nll, RooRealVa
                     if (verbose > 0) std::cout << "[findExpectedLimitFromCrossing] DEBUG : Setting rMin to rCross=" << rCross << std::endl;
                     rMin = rCross; 
                 } else {
-                    if (verbose > 0)std::cout << "[findExpectedLimitFromCrossing] DEBUG : Setting rMax to rCross=" << rCross << std::endl;
+                    if (verbose > 0) std::cout << "[findExpectedLimitFromCrossing] DEBUG : Setting rMax to rCross=" << rCross << std::endl;
                     rMax = rCross;
                 }
                 rCross = 0.5*(rMin+rMax); rErr = 0.5*(rMax-rMin);
 
                 // Catch bad termination
                 if ((rErr <= std::max(rRelAccuracy_*rCross, rAbsAccuracy_)) && (fabs(here - threshold) >= 0.05*minim2.tolerance())) {
-                    std::cout << "[findExpectedLimitFromCrossing] WARNING : rErr accuracy reached without finding threshold!" << std::endl;
-                    std::cout << "[findExpectedLimitFromCrossing] WARNING : here = " << here << " / threshold = " << threshold << " / tolerance = " << 0.05*minim2.tolerance() << std::endl;
-                    std::cout << "Printing (r, nll) values:" << std::endl;
-                    for (unsigned int iChecked = 0; iChecked < checkedR.size(); ++iChecked) {
-                        std::cout << "[findExpectedLimitFromCrossing] WARNING : \t" << checkedR[iChecked] << ", " << checkedNLL[iChecked] << std::endl;
-                    }
-                    if (!robustBisection1 && allowRobustBisection1) {
-                        // Start over with more robust algorithm
-                        std::cout << "[findExpectedLimitFromCrossing] WARNING : Algorithm terminated because rErr reached sufficient accuracy, but crossing was not found. Redoing with a more robust algorithm." << std::endl;
-                        robustBisection1 = true;
-                        rCross = initialRCross;
-                        rMin = initialRMin;
-                        rMax = initialRMax;
-                        rErr = 0.5 * (rMax - rMin);
-                        std::cout << "[findExpectedLimitFromCrossing] WARNING : Forcing new parameters rCross=" << rCross << ", rMin=" << rMin << ", rMax=" << rMax << ", rErr=" << rErr << std::endl;
-                    } else {
-                        std::cout << "[findExpectedLimitFromCrossing] WARNING : Terminating bisection because rErr has reached sufficient accuracy, but crossing was not found with the more robust algorithm (here=" << here << ", threshold=" << threshold << ", r=" << rCross << ")" << std::endl;
-                        std::cout << "[findExpectedLimitFromCrossing] WARNING : I'm going to return the closest value to threshold " << threshold << " from the search. BUT CONSIDER RE_RUNNING THE LIMIT AT THIS POINT!" << std::endl;
-                        double best_dNLL = 1.e30;
-                        double best_rCross = rCross;
+                    if (verbose > 0) {
+                        std::cout << "[findExpectedLimitFromCrossing] WARNING : rErr accuracy reached without finding threshold!" << std::endl;
+                        std::cout << "[findExpectedLimitFromCrossing] WARNING : here = " << here << " / threshold = " << threshold << " / tolerance = " << 0.05*minim2.tolerance() << std::endl;
+                        std::cout << "Printing (r, nll) values:" << std::endl;
                         for (unsigned int iChecked = 0; iChecked < checkedR.size(); ++iChecked) {
-                            double this_dNLL = fabs(checkedNLL[iChecked] - threshold);
-                            if (this_dNLL < best_dNLL) {
-                                best_dNLL = this_dNLL;
-                                best_rCross = checkedR[iChecked];
-                            }
+                            std::cout << "[findExpectedLimitFromCrossing] WARNING : \t" << checkedR[iChecked] << ", " << checkedNLL[iChecked] << std::endl;
                         }
-                        std::cout << "[findExpectedLimitFromCrossing] WARNING : Best r = " << best_rCross << " with dNLL = " << best_dNLL << " (threshold dNLL was " << 0.05*minim2.tolerance() << ")" << std::endl;
-                        rCross = best_rCross;
-                        break;
+                    }
+                    if(allowRobustBisection1) {
+                        if (!robustBisection1) {
+                            // Start over with more robust algorithm
+                            if (verbose > 0) std::cout << "[findExpectedLimitFromCrossing] WARNING : Algorithm terminated because rErr reached sufficient accuracy, but crossing was not found. Redoing with a more robust algorithm." << std::endl;
+                            robustBisection1 = true;
+                            rCross = initialRCross;
+                            rMin = initialRMin;
+                            rMax = initialRMax;
+                            rErr = 0.5 * (rMax - rMin);
+                            if (verbose > 0) std::cout << "[findExpectedLimitFromCrossing] WARNING : Forcing new parameters rCross=" << rCross << ", rMin=" << rMin << ", rMax=" << rMax << ", rErr=" << rErr << std::endl;
+                        } else {
+                            if (verbose > 0) std::cout << "[findExpectedLimitFromCrossing] WARNING : Terminating bisection because rErr has reached sufficient accuracy, but crossing was not found with the more robust algorithm (here=" << here << ", threshold=" << threshold << ", r=" << rCross << ")" << std::endl;
+                            std::cout << "[findExpectedLimitFromCrossing] WARNING : I'm going to return the closest value to threshold " << threshold << " from the search. BUT CONSIDER RE_RUNNING THE LIMIT AT THIS POINT!" << std::endl;
+                            double best_dNLL = 1.e30;
+                            double best_rCross = rCross;
+                            for (unsigned int iChecked = 0; iChecked < checkedR.size(); ++iChecked) {
+                                double this_dNLL = fabs(checkedNLL[iChecked] - threshold);
+                                if (this_dNLL < best_dNLL) {
+                                    best_dNLL = this_dNLL;
+                                    best_rCross = checkedR[iChecked];
+                                }
+                            }
+                            if (verbose > 0) std::cout << "[findExpectedLimitFromCrossing] WARNING : Best r = " << best_rCross << " with dNLL = " << best_dNLL << " (threshold dNLL was " << 0.05*minim2.tolerance() << ")" << std::endl;
+                            rCross = best_rCross;
+                            break;
+                        }
                     }
                 }
                 if (rErr <= std::max(rRelAccuracy_*rCross, rAbsAccuracy_) and verbose > 0) {
@@ -792,7 +796,7 @@ float AsymptoticLimits::findExpectedLimitFromCrossing(RooAbsReal &nll, RooRealVa
                 }
                 if (overstepped) rErr = stride;
             }
-            if (verbose > 0){
+            if (verbose > 1){
                 std::cout << "[findExpectedLimitFromCrossing] DEBUG : Printing stepping fit result (rCross=" << rCross << ")" << std::endl;
                 std::unique_ptr<RooFitResult> res2(minim2.save());
                 res2->Print("V");
