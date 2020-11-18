@@ -257,6 +257,7 @@ int main(int argc, char **argv) {
 	std::string name = modelParamNameVector_[mpi];
   	t->Branch(Form("%s",name.c_str()),  &modelParamValVector_[mpi]);
   }
+  std::cout << "COMBINE_OUTPUT_FILE: " << fileName << std::endl;
   
   writeToysHere = test->mkdir("toys","toys"); 
   if (toysFile != "") readToysFromHere = TFile::Open(toysFile.c_str());
