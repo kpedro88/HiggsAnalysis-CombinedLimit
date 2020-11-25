@@ -52,6 +52,7 @@ protected:
   static bool	     saveWorkspace_;
   static bool        reuseParams_;
   static bool        customStartingPoint_;
+  static bool        customSB_;
   static bool       robustHesse_;
   static bool        saveWithUncertsRequested_;
   static bool        ignoreCovWarning_;
