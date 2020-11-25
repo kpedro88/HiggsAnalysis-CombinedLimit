@@ -59,7 +59,6 @@ bool        FitDiagnostics::skipBOnlyFit_ = false;
 bool        FitDiagnostics::noErrors_ = false;
 bool        FitDiagnostics::reuseParams_ = false;
 bool        FitDiagnostics::customStartingPoint_ = false;
-bool        FitDiagnostics::customSB_ = false;
 bool        FitDiagnostics::robustHesse_ = false;
 bool        FitDiagnostics::saveWithUncertsRequested_=false;
 bool        FitDiagnostics::ignoreCovWarning_=false;
@@ -96,7 +95,6 @@ FitDiagnostics::FitDiagnostics() :
         ("skipBOnlyFit",  	"Skip the B-only fit (do only the S+B fit)")
         ("initFromBonly",  	"Use the values of the nuisance parameters from the background only fit as the starting point for the s+b fit. Can help fit convergence")
         ("customStartingPoint", "Don't set the first POI to 0 for the background-only fit. Instead if using this option, the parameter will be fixed to its default value, which can be set with the --setParameters option.")
-        ("customSB", "As customStartingPoint, but for s+b fit")
         ("ignoreCovWarning",    "Override the default behaviour of saveWithUncertainties being ignored if the covariance matrix is not accurate.")
    ;
 
@@ -368,8 +366,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
   /* S+B fit (Signal parameters free to float ) *************************************************************************************/
 
   if (!reuseParams_) w->loadSnapshot("clean"); // Reset, also ensures nll_prefit is same in call to doFit for b and s+b
-  if (customSB_) { r->setConstant(true); }
-  else { r->setVal(preFitValue_); r->setConstant(false); }
+  r->setVal(preFitValue_); r->setConstant(false); 
   if (minos_ != "all") {
     RooArgList minos; if (minos_ == "poi") minos.add(*r);
     res_s = doFit(*mc_s->GetPdf(), data, minos, constCmdArg_s, /*hesse=*/!noErrors_,/*ndim*/1,/*reuseNLL*/ true); 
