@@ -142,6 +142,13 @@ void FitDiagnostics::applyOptions(const boost::program_options::variables_map &v
 }
 
 bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooStats::ModelConfig *mc_b, RooAbsData &data, double &limit, double &limitErr, const double *hint) {
+  ShapeOpt opts;
+  opts.filterString_          = filterString_;
+  opts.saveShapes_            = saveShapes_;
+  opts.saveWithUncertainties_ = saveWithUncertainties_;
+  opts.numToysForShapes_      = numToysForShapes_;
+  opts.saveOverallShapes_     = saveOverallShapes_;
+  opts.oldNormNames_          = oldNormNames_;
 
   if (reuseParams_ && minos_!="none"){
 	std::cout << "Cannot reuse b-only fit params when running minos. Parameters will be reset when running S+B fit"<<std::endl;
@@ -181,7 +188,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
           RooArgSet *norms = new RooArgSet();
           norms->setName("norm_prefit");
           ToySampler sampler(&*nuisancePdf, nuis);
-          getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? fitOut.get() : 0, "_prefit",data);
+          FitDiagnostics::getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? fitOut.get() : 0, "_prefit",data,opts);
           delete norms;
       }
       if (withSystematics)	{
@@ -194,7 +201,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
 	   getNormalizationsSimple(mc_s->GetPdf(), *mc_s->GetObservables(), *norms);
 	   setNormsFitResultTrees(norms,processNormalizations_);
 	   std::map<std::string,ShapeAndNorm> snm;
-	   getShapesAndNorms(mc_s->GetPdf(),*mc_s->GetObservables(), snm, "");
+	   FitDiagnostics::getShapesAndNorms(mc_s->GetPdf(),*mc_s->GetObservables(), snm, "", filterString_);
 	   setShapesFitResultTrees(snm,processNormalizationsShapes_);
 	   delete norms;
       }
@@ -323,7 +330,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
           getNormalizationsSimple(mc_s->GetPdf(), *mc_s->GetObservables(), *norms);
           setNormsFitResultTrees(norms,processNormalizations_);
 	  std::map<std::string,ShapeAndNorm> snm;
-	  getShapesAndNorms(mc_s->GetPdf(),*mc_s->GetObservables(), snm, "");
+	  FitDiagnostics::getShapesAndNorms(mc_s->GetPdf(),*mc_s->GetObservables(), snm, "", filterString_);
           setShapesFitResultTrees(snm,processNormalizationsShapes_);
 	  delete norms;
 
@@ -332,7 +339,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
           RooArgSet *norms = new RooArgSet();
           norms->setName("norm_fit_b");
           CovarianceReSampler sampler(res_b);
-          getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? fitOut.get() : 0, "_fit_b",data);
+          FitDiagnostics::getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? fitOut.get() : 0, "_fit_b",data,opts);
 	  delete norms;
       }
 
@@ -436,7 +443,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
           getNormalizationsSimple(mc_s->GetPdf(), *mc_s->GetObservables(), *norms);
           setNormsFitResultTrees(norms,processNormalizations_);
 	  std::map<std::string,ShapeAndNorm> snm;
-	  getShapesAndNorms(mc_s->GetPdf(),*mc_s->GetObservables(), snm, "");
+	  FitDiagnostics::getShapesAndNorms(mc_s->GetPdf(),*mc_s->GetObservables(), snm, "", filterString_);
           setShapesFitResultTrees(snm,processNormalizationsShapes_);
 	  delete norms;
       }
@@ -444,7 +451,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
           RooArgSet *norms = new RooArgSet();
           norms->setName("norm_fit_s");
           CovarianceReSampler sampler(res_s);
-          getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? fitOut.get() : 0, "_fit_s",data);
+          FitDiagnostics::getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? fitOut.get() : 0, "_fit_s",data,opts);
 	  delete norms;
       }
 
@@ -543,7 +550,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
 
 void FitDiagnostics::getNormalizationsSimple(RooAbsPdf *pdf, const RooArgSet &obs, RooArgSet &out) {
     std::map<std::string,ShapeAndNorm> snm;
-    getShapesAndNorms(pdf,obs, snm, "");
+    FitDiagnostics::getShapesAndNorms(pdf,obs, snm, "", filterString_);
     std::map<std::string,ShapeAndNorm>::const_iterator bg = snm.begin(), ed = snm.end(), pair; int i;
     for (pair = bg, i = 0; pair != ed; ++pair, ++i) {
         RooRealVar *val = new RooRealVar((oldNormNames_ ? pair->first : pair->second.channel+"/"+pair->second.process).c_str(), "",pair->second.norm->getVal());
@@ -552,14 +559,14 @@ void FitDiagnostics::getNormalizationsSimple(RooAbsPdf *pdf, const RooArgSet &ob
     }
     return;
 }
-void FitDiagnostics::getShapesAndNorms(RooAbsPdf *pdf, const RooArgSet &obs, std::map<std::string,ShapeAndNorm> &out, const std::string &channel) {
+void FitDiagnostics::getShapesAndNorms(RooAbsPdf *pdf, const RooArgSet &obs, std::map<std::string,ShapeAndNorm> &out, const std::string &channel, const std::string& filterString) {
     RooSimultaneous *sim = dynamic_cast<RooSimultaneous *>(pdf);
     if (sim != 0) {
         RooAbsCategoryLValue &cat = const_cast<RooAbsCategoryLValue &>(sim->indexCat());
         for (int i = 0, n = cat.numBins((const char *)0); i < n; ++i) {
             cat.setBin(i);
             RooAbsPdf *pdfi = sim->getPdf(cat.getLabel());
-            if (pdfi) getShapesAndNorms(pdfi, obs, out, cat.getLabel());
+            if (pdfi) FitDiagnostics::getShapesAndNorms(pdfi, obs, out, cat.getLabel(), filterString);
         }        
         return;
     }
@@ -568,7 +575,7 @@ void FitDiagnostics::getShapesAndNorms(RooAbsPdf *pdf, const RooArgSet &obs, std
         RooArgList list(prod->pdfList());
         for (int i = 0, n = list.getSize(); i < n; ++i) {
             RooAbsPdf *pdfi = (RooAbsPdf *) list.at(i);
-            if (pdfi->dependsOn(obs)) getShapesAndNorms(pdfi, obs, out, channel);
+            if (pdfi->dependsOn(obs)) FitDiagnostics::getShapesAndNorms(pdfi, obs, out, channel, filterString);
         }
         return;
     }
@@ -579,7 +586,7 @@ void FitDiagnostics::getShapesAndNorms(RooAbsPdf *pdf, const RooArgSet &obs, std
         for (int i = 0, n = clist.getSize(); i < n; ++i) {
             RooAbsReal *coeff = (RooAbsReal *) clist.at(i);
 	    std::string coeffName = coeff->GetName();
-	    if (coeffName.find(filterString_) == std::string::npos) continue; 
+	    if (coeffName.find(filterString) == std::string::npos) continue; 
             ShapeAndNorm &ns = out[coeffName];
             ns.norm = coeff;
             ns.pdf = (RooAbsPdf*) plist.at(i);
@@ -608,7 +615,7 @@ void FitDiagnostics::getShapesAndNorms(RooAbsPdf *pdf, const RooArgSet &obs, std
       for (int i = 0, n = clist.getSize(); i < n; ++i) {
         RooAbsReal *coeff = (RooAbsReal *) clist.at(i);
         std::string coeffName = coeff->GetName();
-        if (coeffName.find(filterString_) == std::string::npos) continue;
+        if (coeffName.find(filterString) == std::string::npos) continue;
         ShapeAndNorm &ns = out[coeffName];
         RooAbsReal* shape = (RooAbsReal*)plist.at(i);
         std::auto_ptr<RooArgSet> myobs(shape->getObservables(obs));
@@ -635,16 +642,16 @@ void FitDiagnostics::getShapesAndNorms(RooAbsPdf *pdf, const RooArgSet &obs, std
     }
 }
 
-void FitDiagnostics::getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, RooArgSet &out, NuisanceSampler & sampler, TDirectory *fOut, const std::string &postfix,RooAbsData &data) {
+void FitDiagnostics::getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, RooArgSet &out, NuisanceSampler & sampler, TDirectory *fOut, const std::string &postfix,RooAbsData &data, const ShapeOpt& opts) {
     // fill in a map
     std::map<std::string,ShapeAndNorm> snm;
-    getShapesAndNorms(pdf,obs, snm, "");
+    FitDiagnostics::getShapesAndNorms(pdf,obs, snm, "", opts.filterString_);
     typedef std::map<std::string,ShapeAndNorm>::const_iterator IT;
     typedef std::map<std::string,TH1*>::const_iterator IH;
     typedef std::map<std::string,TGraphAsymmErrors*>::const_iterator IG;
     typedef std::map<std::string,TH2*>::const_iterator IH2;
     // create directory structure for shapes
-    TDirectory *shapeDir = fOut && saveShapes_ ? fOut->mkdir((std::string("shapes")+postfix).c_str()) : 0;
+    TDirectory *shapeDir = fOut && opts.saveShapes_ ? fOut->mkdir((std::string("shapes")+postfix).c_str()) : 0;
     std::map<std::string,TDirectory*> shapesByChannel;
     std::map<std::string,TGraphAsymmErrors*> datByCh;
     if (shapeDir) {
@@ -672,7 +679,7 @@ void FitDiagnostics::getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, Roo
     for (pair = bg, i = 0; pair != ed; ++pair, ++i) {  
         vals[i] = pair->second.norm->getVal();
         //out.addOwned(*(new RooConstVar(pair->first.c_str(), "", pair->second.norm->getVal())));
-        if (fOut != 0 && saveShapes_ && pair->second.obs.getSize() == 1) {
+        if (fOut != 0 && opts.saveShapes_ && pair->second.obs.getSize() == 1) {
             RooRealVar *x = (RooRealVar*)pair->second.obs.at(0);
             TH1* hist = pair->second.pdf->createHistogram("", *x, pair->second.isfunc ? RooFit::Extended(false) : RooCmdArg::none());
             for (int binN = 1; binN <= hist->GetNbinsX(); ++binN){
@@ -682,7 +689,7 @@ void FitDiagnostics::getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, Roo
             hist->Scale(vals[i] / hist->Integral("width"));
             hist->SetDirectory(shapesByChannel[pair->second.channel]);
             shapes[i] = hist;
-            //if (saveWithUncertainties_) {
+            //if (opts.saveWithUncertainties_) {
             shapes2[i] = (TH1*) hist->Clone();
             shapes2[i]->SetDirectory(0);
             shapes2[i]->Reset();
@@ -778,8 +785,8 @@ void FitDiagnostics::getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, Roo
     datOverall->SetNameTitle("total_data","Total data");
     delete datOverallHist;
 
-    if (saveWithUncertainties_) {
-        int ntoys = numToysForShapes_;
+    if (opts.saveWithUncertainties_) {
+        int ntoys = opts.numToysForShapes_;
 
         if ( verbose > 0 ) Logger::instance().log(std::string(Form("FitDiagnostics.cc: %d -- Generating toy data for evaluating per-bin uncertainties and covariances with post-fit nuisance parameters with %d toys",__LINE__,ntoys)),Logger::kLogLevelInfo,__func__);
 
@@ -800,7 +807,7 @@ void FitDiagnostics::getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, Roo
             for (pair = bg, i = 0; pair != ed; ++pair, ++i) { 
                 // add up deviations in numbers for each channel
                 sumx2[i] += std::pow(pair->second.norm->getVal() - vals[i], 2);  
-                if (saveShapes_ && pair->second.obs.getSize() == 1) {
+                if (opts.saveShapes_ && pair->second.obs.getSize() == 1) {
                     // and also deviations in the shapes
                     RooRealVar *x = (RooRealVar*)pair->second.obs.at(0);
                     std::auto_ptr<TH1> hist(pair->second.pdf->createHistogram(pair->second.pdf->GetName(), *x,
@@ -837,7 +844,7 @@ void FitDiagnostics::getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, Roo
 		}
 	    }
             // deviations across channels in this toy
-	    if (saveOverallShapes_){
+	    if (opts.saveOverallShapes_){
 		for (IH h = totByCh1.begin(), eh = totByCh1.end(); h != eh; ++h) {
 		    TH1 *reference = totByCh[h->first];
 		    for (IH h2 = totByCh1.begin();h2 != h; ++h2) {
@@ -934,7 +941,7 @@ void FitDiagnostics::getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, Roo
 	shapesByChannel[h->first]->WriteTObject(h->second);
     }
     for (pair = bg, i = 0; pair != ed; ++pair, ++i) {
-        RooRealVar *val = new RooRealVar((oldNormNames_ ? pair->first : pair->second.channel+"/"+pair->second.process).c_str(), "", vals[i]);
+        RooRealVar *val = new RooRealVar((opts.oldNormNames_ ? pair->first : pair->second.channel+"/"+pair->second.process).c_str(), "", vals[i]);
         val->setError(sumx2[i]);
         out.addOwned(*val); 
         if (shapes[i]) shapesByChannel[pair->second.channel]->WriteTObject(shapes[i]);
@@ -946,9 +953,9 @@ void FitDiagnostics::getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, Roo
         for (IH h = bkgByCh.begin(), eh = bkgByCh.end(); h != eh; ++h) { shapesByChannel[h->first]->WriteTObject(h->second); }
         for (IH2 h = totByCh2Covar.begin(), eh = totByCh2Covar.end(); h != eh; ++h) { shapesByChannel[h->first]->WriteTObject(h->second); }
 	//Save total shapes or clean up if not keeping
-	if (saveShapes_) shapeDir->cd();
+	if (opts.saveShapes_) shapeDir->cd();
 
-	if (saveShapes_ && saveOverallShapes_){
+	if (opts.saveShapes_ && opts.saveOverallShapes_){
 	    totOverall->Write();
 	    sigOverall->Write();
 	    datOverall->Write();
@@ -960,7 +967,7 @@ void FitDiagnostics::getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, Roo
 	    delete datOverall;
 	    delete bkgOverall;
 	}
-	if (saveWithUncertainties_ && saveOverallShapes_){
+	if (opts.saveWithUncertainties_ && opts.saveOverallShapes_){
 	    totOverall2Covar->Write();
 	}
 	else{
@@ -1075,7 +1082,7 @@ void FitDiagnostics::createFitResultTrees(const RooStats::ModelConfig &mc, bool 
          //getNormalizationsSimple(mc.GetPdf(), *mc.GetObservables(), *norms);  <-- This is useless as the order is messed up !
 
          std::map<std::string,ShapeAndNorm> snm;
-         getShapesAndNorms(mc.GetPdf(),*mc.GetObservables(), snm, "");
+         FitDiagnostics::getShapesAndNorms(mc.GetPdf(),*mc.GetObservables(), snm, "", filterString_);
          typedef std::map<std::string,ShapeAndNorm>::const_iterator IT;
          IT bg = snm.begin(), ed = snm.end(), pair; int i;
 	 int totalBins = 0;

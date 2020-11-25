@@ -15,6 +15,15 @@
 #include <boost/utility.hpp>
 #include <map>
 
+struct ShapeOpt {
+  std::string filterString_ = "";
+  bool saveShapes_ = false;
+  bool saveWithUncertainties_ = false;
+  bool numToysForShapes_ = false;
+  bool saveOverallShapes_ = false;
+  bool oldNormNames_ = false;
+};
+
 class FitDiagnostics : public FitterAlgoBase {
 public:
   FitDiagnostics() ;
@@ -83,7 +92,9 @@ protected:
     bool isfunc;
   };
   void setShapesFitResultTrees(std::map<std::string,ShapeAndNorm> &snm, double *);
-  void getShapesAndNorms(RooAbsPdf *pdf, const RooArgSet &obs, std::map<std::string, ShapeAndNorm> &shapesAndNorms, const std::string &channel);
+
+public:
+  static void getShapesAndNorms(RooAbsPdf *pdf, const RooArgSet &obs, std::map<std::string, ShapeAndNorm> &shapesAndNorms, const std::string &channel, const std::string& filterString);
 
   class NuisanceSampler { 
     public:
@@ -92,7 +103,7 @@ protected:
         virtual const RooAbsCollection & get(int itoy) = 0;
         virtual const RooAbsCollection & centralValues() = 0;
   };
-  void getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, RooArgSet &out, NuisanceSampler &sampler, TDirectory *fOut, const std::string &postfix,RooAbsData &data);
+  static void getNormalizations(RooAbsPdf *pdf, const RooArgSet &obs, RooArgSet &out, NuisanceSampler &sampler, TDirectory *fOut, const std::string &postfix,RooAbsData &data, const ShapeOpt& opts);
 
   class CovarianceReSampler : public NuisanceSampler {
     public:

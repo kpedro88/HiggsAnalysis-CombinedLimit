@@ -18,6 +18,7 @@
 #include "HiggsAnalysis/CombinedLimit/interface/CloseCoutSentry.h"
 #include "HiggsAnalysis/CombinedLimit/interface/utils.h"
 #include "HiggsAnalysis/CombinedLimit/interface/RobustHesse.h"
+#include "HiggsAnalysis/CombinedLimit/interface/FitDiagnostics.h"
 
 #include <Math/Minimizer.h>
 #include <Math/MinimizerOptions.h>
@@ -27,6 +28,9 @@
 using namespace RooStats;
 
 std::string MultiDimFit::name_ = "";
+std::string MultiDimFit::massName_ = "";
+std::string MultiDimFit::toyName_ = "";
+std::string MultiDimFit::out_ = ".";
 MultiDimFit::Algo MultiDimFit::algo_ = None;
 MultiDimFit::GridType MultiDimFit::gridType_ = G1x1;
 std::vector<std::string>  MultiDimFit::poi_;
@@ -48,6 +52,7 @@ bool MultiDimFit::hasMaxDeltaNLLForProf_ = false;
 bool MultiDimFit::squareDistPoiStep_ = false;
 bool MultiDimFit::skipInitialFit_ = false;
 bool MultiDimFit::saveFitResult_ = false;
+bool MultiDimFit::saveShapes_ = false;
 float MultiDimFit::maxDeltaNLLForProf_ = 200;
 float MultiDimFit::autoRange_ = -1.0;
 std::string MultiDimFit::fixedPointPOIs_ = "";
@@ -99,7 +104,9 @@ MultiDimFit::MultiDimFit() :
 	("startFromPreFit",   boost::program_options::value<bool>(&startFromPreFit_)->default_value(startFromPreFit_), "Start each point of the likelihood scan from the pre-fit values")
     ("alignEdges",   boost::program_options::value<bool>(&alignEdges_)->default_value(alignEdges_), "Align the grid points such that the endpoints of the ranges are included")
     ("setParametersForGrid", boost::program_options::value<std::string>(&setParametersForGrid_)->default_value(""), "Set the values of relevant physics model parameters. Give a comma separated list of parameter value assignments. Example: CV=1.0,CF=1.0")
-	("saveFitResult",  "Save RooFitResult to muiltidimfit.root")
+	("saveFitResult",  "Save RooFitResult to multidimfit.root")
+    ("saveShapes",  	"Save pre and post-fit distributions as TH1 in multidimfit.root")
+    ("out", boost::program_options::value<std::string>(&out_)->default_value(out_), "Directory to put the diagnostics output file in")
     ("robustHesse",  boost::program_options::value<bool>(&robustHesse_)->default_value(robustHesse_),  "Use a more robust calculation of the hessian/covariance matrix")
     ("robustHesseLoad",  boost::program_options::value<std::string>(&robustHesseLoad_)->default_value(robustHesseLoad_),  "Load the pre-calculated Hessian")
     ("robustHesseSave",  boost::program_options::value<std::string>(&robustHesseSave_)->default_value(robustHesseSave_),  "Save the calculated Hessian")
@@ -138,8 +145,11 @@ void MultiDimFit::applyOptions(const boost::program_options::variables_map &vm)
     hasMaxDeltaNLLForProf_ = !vm["maxDeltaNLLForProf"].defaulted();
     loadedSnapshot_ = !vm["snapshotName"].defaulted();
     savingSnapshot_ = vm.count("saveWorkspace");
-    name_ = vm["name"].defaulted() ?  std::string() : vm["name"].as<std::string>();
+    name_ = vm["name"].as<std::string>();
+    massName_ = vm["massName"].as<std::string>();
+    toyName_ = vm["toyName"].as<std::string>();
     saveFitResult_ = (vm.count("saveFitResult") > 0);
+    saveShapes_ = (vm.count("saveShapes") > 0);
 }
 
 bool MultiDimFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooStats::ModelConfig *mc_b, RooAbsData &data, double &limit, double &limitErr, const double *hint) { 
@@ -148,6 +158,8 @@ bool MultiDimFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooS
 
     static int isInit = false;
     if (!isInit) { initOnce(w, mc_s); isInit = true; }
+
+    if (saveFitResult_ or saveShapes_) fitOut.reset(TFile::Open((out_+"/multidimfit"+name_+"."+massName_+toyName_+"root").c_str(), "RECREATE"));
 
     // Get PDF
     RooAbsPdf &pdf = *mc_s->GetPdf();
@@ -184,6 +196,14 @@ bool MultiDimFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooS
             std::cout << "\n WARNING: MultiDimFit failed" <<std::endl;
             std::cout << "\n ---------------------------" <<std::endl;
             std::cout << "\n " <<std::endl;
+        }
+        else if (saveShapes_) {
+            RooArgSet *norms = new RooArgSet();
+            norms->setName("norm_fit");
+            FitDiagnostics::CovarianceReSampler sampler(res.get());
+            ShapeOpt opts;
+            opts.saveShapes_ = true;
+            FitDiagnostics::getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, fitOut.get(), "_fit",data,opts);
         }
         if (algo_ == Impact && res.get()) {
             // Set the floating parameters back to the best-fit value
@@ -278,9 +298,9 @@ bool MultiDimFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooS
                 printf("   %*s :  %+8.3f\n", len, poi_[i].c_str(), poiVals_[i]);
             }
 	  }
-          if(res.get() && saveFitResult_) saveResult(*res);
+          if(res.get() && (saveFitResult_ or saveShapes_)) saveResult(*res);
           break;
-        case Singles: if (res.get()) { doSingles(*res); if (saveFitResult_) {saveResult(*res);} } break;
+        case Singles: if (res.get()) { doSingles(*res); if (saveFitResult_ or saveShapes_) {saveResult(*res);} } break;
         case Cross: doBox(*nll, cl, "box", true); break;
         case Grid: doGrid(w,*nll); break;
         case RandomPoints: doRandomPoints(w,*nll); break;
@@ -1149,8 +1169,7 @@ void MultiDimFit::doBox(RooAbsReal &nll, double cl, const char *name, bool commi
 
 void MultiDimFit::saveResult(RooFitResult &res) {
     if (verbose>2) res.Print();
-    fitOut.reset(TFile::Open(("multidimfit"+name_+".root").c_str(), "RECREATE"));
-    fitOut->WriteTObject(&res,"fit_mdf");
+    if(saveFitResult_) fitOut->WriteTObject(&res,"fit_mdf");
     fitOut->cd();
     fitOut.release()->Close();
 }

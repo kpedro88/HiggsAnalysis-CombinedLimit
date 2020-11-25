@@ -38,6 +38,9 @@ protected:
   static float                     deltaNLL_;
 
   static std::string name_;
+  static std::string massName_;
+  static std::string toyName_;
+  static std::string out_;
   std::auto_ptr<TFile> fitOut;
 
   // options    
@@ -53,6 +56,7 @@ protected:
   static bool  startFromPreFit_;
   static bool  alignEdges_;
   static bool  saveFitResult_;
+  static bool  saveShapes_;
   static std::string fixedPointPOIs_;
   static float centeredRange_;
   static std::string setParametersForGrid_;
