@@ -84,6 +84,7 @@ int main(int argc, char **argv) {
     ("toys,t", po::value<int>(&runToys)->default_value(0), "Number of Toy MC extractions")
     ("seed,s", po::value<int>(&seed)->default_value(123456), "Toy MC random seed")
     ("hintMethod,H",  po::value<string>(&whichHintMethod)->default_value(""), "Run first this method to provide a hint on the result")
+    ("seedInName", "always put random seed in output filenames")
     ;
   combiner.ioOptions().add_options()
     ("name,n",     po::value<string>(&name)->default_value("Test"), "Name of the job, affects the name of the output tree")
@@ -189,7 +190,7 @@ int main(int argc, char **argv) {
   RooRandom::randomGenerator()->SetSeed(seed); 
 
   TString massName = TString::Format("mH%g.", iMass);
-  TString toyName  = "";  if (runToys > 0 || seed != 123456 || vm.count("saveToys")) toyName  = TString::Format("%d.", seed);
+  TString toyName  = "";  if (runToys > 0 || seed != 123456 || vm.count("saveToys") || vm.count("seedInName")) toyName  = TString::Format("%d.", seed);
   if (vm.count("expectedFromGrid") && !vm["expectedFromGrid"].defaulted()) toyName += TString::Format("quant%.3f.", vm["expectedFromGrid"].as<float>());
   if (vm.count("expected")         && !vm["expected"].defaulted())         toyName += TString::Format("quant%.3f.", vm["expected"].as<float>());
 
