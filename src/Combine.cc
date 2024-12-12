@@ -74,6 +74,7 @@ LimitAlgo * algo, * hintAlgo;
 
 Float_t t_cpu_, t_real_;
 Float_t g_quantileExpected_ = -1.0;
+int g_status_ = 0;
 TDirectory *outputFile = 0;
 TDirectory *writeToysHere = 0;
 TDirectory *readToysFromHere = 0;
@@ -1166,9 +1167,11 @@ void Combine::toggleGlobalFillTree(bool flag){
    g_fillTree_ = flag;
 }
 
-void Combine::commitPoint(bool expected, float quantile) {
+void Combine::commitPoint(bool expected, float quantile, int status) {
     Float_t saveQuantile =  g_quantileExpected_;
     g_quantileExpected_ = quantile;
+    int saveStatus = g_status_;
+    g_status_ = status;
 
     for (auto& it : trackedParametersMap_){
       it.second = (it.first)->getVal();
@@ -1179,6 +1182,7 @@ void Combine::commitPoint(bool expected, float quantile) {
 
     if (g_fillTree_) tree_->Fill();
     g_quantileExpected_ = saveQuantile;
+    g_status_ = saveStatus;
 }
 
 void Combine::addBranch(const char *name, void *address, const char *leaflist) {

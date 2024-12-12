@@ -51,7 +51,8 @@ CascadeMinimizer::CascadeMinimizer(RooAbsReal &nll, Mode mode, RooRealVar *poi) 
     nuisances_(0),
     autoBounds_(false),
     poisForAutoBounds_(0),
-    poisForAutoMax_(0)
+    poisForAutoMax_(0),
+    status_(0)
 {
     remakeMinimizer();
 }
@@ -196,23 +197,23 @@ bool CascadeMinimizer::improveOnce(int verbose, bool noHesse)
             if (simnll) simnll->updateZeroPoint(); 
             minimizer_->setPrintLevel(verbose-1); 
         }
-        int status = minimizer_->minimize(myType.c_str(), myAlgo.c_str());
+        status_ = minimizer_->minimize(myType.c_str(), myAlgo.c_str());
         if (lastHesse_ && !noHesse) {
             if (simnll) simnll->updateZeroPoint(); 
             minimizer_->setPrintLevel(std::max(0,verbose-3)); 
-            status = minimizer_->hesse();
+            status_ = minimizer_->hesse();
             minimizer_->setPrintLevel(verbose-1); 
-    	    if (verbose+2>0 ) CombineLogger::instance().log("CascadeMinimizer.cc",__LINE__,std::string(Form("Hesse finished with status=%d",status)),__func__);
+    	    if (verbose+2>0 ) CombineLogger::instance().log("CascadeMinimizer.cc",__LINE__,std::string(Form("Hesse finished with status=%d",status_)),__func__);
         }
         if (simnll) simnll->clearZeroPoint();
-        outcome = (status == 0 || status == 1);
+        outcome = (status_ == 0 || status_ == 1);
       // Severe enough that we should print this to the terminal too
-	    if (status==1) { 
+	    if (status_==1) { 
         std::cerr << "[WARNING] Minimization finished with status 1 (covariance matrix forced positive definite), this could indicate a problem with the minimum!" << std::endl;
         if (verbose+2>0 ) CombineLogger::instance().log("CascadeMinimizer.cc",__LINE__,"[WARNING] Minimization finished with status 1 (covariance matrix forced positive definite), this could indicate a problem with the minimum.",__func__);
       }
     	if (verbose+2>0 ) {
-		  CombineLogger::instance().log("CascadeMinimizer.cc",__LINE__,std::string(Form("Minimization finished with status=%d",status)),__func__);
+		  CombineLogger::instance().log("CascadeMinimizer.cc",__LINE__,std::string(Form("Minimization finished with status=%d",status_)),__func__);
 	    }
     }
     if (verbose+2>0 ){
@@ -376,6 +377,7 @@ bool CascadeMinimizer::iterativeMinimize(double &minimumNLL,int verbose, bool ca
 
 bool CascadeMinimizer::minimize(int verbose, bool cascade) 
 {
+    status_ = 0;
     static int optConst = runtimedef::get("MINIMIZER_optimizeConst");
     static int rooFitOffset = runtimedef::get("MINIMIZER_rooFitOffset");
     if (runtimedef::get("CMIN_CENSURE")) {
@@ -408,7 +410,7 @@ bool CascadeMinimizer::minimize(int verbose, bool cascade)
         if (simnll) simnll->setZeroPoint();
         if (optConst) minimizer_->optimizeConst(std::max(0,optConst));
         if (rooFitOffset) minimizer_->setOffsetting(std::max(0,rooFitOffset));
-        minimizer_->minimize(ROOT::Math::MinimizerOptions::DefaultMinimizerType().c_str(), ROOT::Math::MinimizerOptions::DefaultMinimizerAlgo().c_str());
+        status_ = minimizer_->minimize(ROOT::Math::MinimizerOptions::DefaultMinimizerType().c_str(), ROOT::Math::MinimizerOptions::DefaultMinimizerAlgo().c_str());
         if (simnll) simnll->clearZeroPoint();
         utils::setAllConstant(frozen,false);
         freezeDiscParams(false);

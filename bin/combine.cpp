@@ -274,6 +274,7 @@ int main(int argc, char **argv) {
   t->Branch("t_cpu",   &t_cpu_,  "t_cpu/F");
   t->Branch("t_real",  &t_real_, "t_real/F");
   t->Branch("quantileExpected",  &g_quantileExpected_, "quantileExpected/F");
+  t->Branch("status",  &g_status_, "status/I");
   for (unsigned int mpi=0;mpi<modelParamNameVector_.size();++mpi){
 	std::string name = modelParamNameVector_[mpi];
   	t->Branch(Form("%s",name.c_str()),  &modelParamValVector_[mpi]);

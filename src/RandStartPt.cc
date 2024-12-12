@@ -117,12 +117,9 @@ std::map<std::string, std::vector<float>> RandStartPt::getRangesDictFromInString
     return out_range_dict;
 }
 
-void RandStartPt::commitBestNLLVal(unsigned int idx, float &nllVal, double &probVal){//, RooAbsReal& nll_){
-    if (idx==0){
-        Combine::commitPoint(true, /*quantile=*/probVal);
-        nllVal = nll_.getVal();
-    } else if (nll_.getVal() < nllVal){
-        Combine::commitPoint(true, /*quantile=*/probVal);
+void RandStartPt::commitBestNLLVal(unsigned int idx, float &nllVal, double &probVal, int status){
+    if (idx==0 or nll_.getVal() < nllVal){
+        Combine::commitPoint(true, /*quantile=*/probVal, /*status=*/status);
         nllVal = nll_.getVal();
     }
 }
@@ -181,7 +178,7 @@ void RandStartPt::doRandomStartPt1DGridScan(double &xval, unsigned int poiSize, 
              double prob = ROOT::Math::chisquared_cdf_c(qN, poiSize + nOtherFloatingPOI_);
              setValSpecifiedObjs();
              //finally, commit best NLL value
-             commitBestNLLVal(start_pt_idx, current_best_nll, prob);
+             commitBestNLLVal(start_pt_idx, current_best_nll, prob, minimObj.status());
          }
     }
 }
@@ -229,7 +226,7 @@ void RandStartPt::doRandomStartPt2DGridScan(double &xval, double &yval, unsigned
             double qN = 2*(deltaNLL);
             double prob = ROOT::Math::chisquared_cdf_c(qN, poiSize + nOtherFloatingPOI_);
             setValSpecifiedObjs();
-            commitBestNLLVal(start_pt_idx, current_best_nll, prob);
+            commitBestNLLVal(start_pt_idx, current_best_nll, prob, minimObj.status());
         }
         if (gridType == MultiDimFit::G3x3){
             bool forceProfile = !fastscan_  && std::min(fabs(deltaNLL - 1.15), fabs(deltaNLL - 2.995)) < 0.5;
@@ -257,7 +254,7 @@ void RandStartPt::doRandomStartPt2DGridScan(double &xval, double &yval, unsigned
                     double qN = 2*(deltaNLL);
                     double prob = ROOT::Math::chisquared_cdf_c(qN, poiSize + nOtherFloatingPOI_);
                     setValSpecifiedObjs();
-                    commitBestNLLVal(start_pt_idx, current_best_nll, prob);
+                    commitBestNLLVal(start_pt_idx, current_best_nll, prob, minimObj.status());
                 }
             }
         }

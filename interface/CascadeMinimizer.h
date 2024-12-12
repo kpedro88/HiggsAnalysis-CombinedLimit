@@ -29,6 +29,7 @@ class CascadeMinimizer {
         void setNuisanceParameters(const RooArgSet *nuis) { nuisances_ = nuis; }
         RooMinimizer & minimizer() { return *minimizer_; }
         RooFitResult *save() { return minimizer().save(); }
+        int status() const { return status_; }
         void  setStrategy(int strategy) { strategy_ = strategy; }
         void  setErrorLevel(float errorLevel) { minimizer_->setErrorLevel(errorLevel); }
         static void  initOptions() ;
@@ -51,6 +52,7 @@ class CascadeMinimizer {
         /// automatically enlarge bounds for POIs if they're within 10% from the boundary
         bool autoBounds_;
         const RooArgSet *poisForAutoBounds_, *poisForAutoMax_;
+        int status_;
 
         bool improveOnce(int verbose, bool noHesse=false);
         bool autoBoundsOk(int verbose) ;

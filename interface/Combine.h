@@ -18,6 +18,7 @@ class RooAbsData;
 namespace RooStats { class ModelConfig; }
 
 extern Float_t t_cpu_, t_real_, g_quantileExpected_; 
+extern int g_status_;
 extern bool g_fillTree_; 
 //RooWorkspace *writeToysHere = 0;
 extern TDirectory *outputFile;
@@ -63,7 +64,7 @@ public:
   static void toggleGlobalFillTree(bool flag=false);
 
   /// Save a point into the output tree. Usually if expected = false, quantile should be set to -1 (except e.g. for saveGrid option of HybridNew)
-  static void commitPoint(bool expected, float quantile);
+  static void commitPoint(bool expected, float quantile, int status=0);
 
   /// Add a branch to the output tree (for advanced use or debugging only)
   static void addBranch(const char *name, void *address, const char *leaflist) ;
