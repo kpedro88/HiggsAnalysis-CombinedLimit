@@ -793,6 +793,7 @@ class ShapeBuilder(ModelBuilder):
                         accessors = {
                             "RooGenericPdf": "dependents",
                             "RooParametricShapeBinPdf": "getPars",
+                            "RooParametricHist": "getAllBinVars",
                         }
                         def import_pars(pdf):
                             accessor = accessors[pdf.ClassName()]
