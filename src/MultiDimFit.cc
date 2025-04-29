@@ -33,7 +33,6 @@ using namespace RooStats;
 std::string MultiDimFit::name_ = "";
 std::string MultiDimFit::massName_ = "";
 std::string MultiDimFit::toyName_ = "";
-std::string MultiDimFit::out_ = ".";
 MultiDimFit::Algo MultiDimFit::algo_ = None;
 MultiDimFit::GridType MultiDimFit::gridType_ = G1x1;
 std::vector<std::string>  MultiDimFit::poi_;
@@ -122,7 +121,6 @@ MultiDimFit::MultiDimFit() :
         ("alignEdges",   boost::program_options::value<bool>(&alignEdges_)->default_value(alignEdges_), "Align the grid points such that the endpoints of the ranges are included")
         ("setParametersForGrid", boost::program_options::value<std::string>(&setParametersForGrid_)->default_value(""), "Set the values of relevant physics model parameters. Give a comma separated list of parameter value assignments. Example: CV=1.0,CF=1.0")
         ("saveFitResult",  "Save RooFitResult to multidimfit.root")
-        ("out", boost::program_options::value<std::string>(&out_)->default_value(out_), "Directory to put the diagnostics output file in")
         ("robustHesse",  boost::program_options::value<bool>(&robustHesse_)->default_value(robustHesse_),  "Use a more robust calculation of the hessian/covariance matrix")
         ("robustHesseLoad",  boost::program_options::value<std::string>(&robustHesseLoad_)->default_value(robustHesseLoad_),  "Load the pre-calculated Hessian")
         ("robustHesseSave",  boost::program_options::value<std::string>(&robustHesseSave_)->default_value(robustHesseSave_),  "Save the calculated Hessian")
@@ -1211,17 +1209,7 @@ void MultiDimFit::doBox(RooAbsReal &nll, double cl, const char *name, bool commi
 
 void MultiDimFit::saveResult(RooFitResult &res) {
     if (verbose>2) res.Print();
-    if (out_ == "none") return;
-    const bool longName = runtimedef::get(std::string("longName"));
-    std::string mdname(out_+"/multidimfit"+name_);
-    if (longName)
-        mdname += "."+massName_+toyName_+"root";
-    else
-        mdname += ".root";
-    fitOut.reset(TFile::Open(mdname.c_str(), "RECREATE"));
-    fitOut->WriteTObject(&res,"fit_mdf");
-    fitOut->cd();
-    fitOut.release()->Close();
+	outputFile->WriteTObject(&res,"fit_mdf");
 }
 
 void MultiDimFit::splitGridPoints(const std::string& s, std::vector<unsigned int>& points) const {

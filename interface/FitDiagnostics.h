@@ -59,7 +59,6 @@ protected:
   int overallBins_,overallNorms_,overallNuis_,overallCons_;
   int fitStatus_, numbadnll_;
   double mu_, muErr_, muLoErr_, muHiErr_, nll_nll0_, nll_bonly_, nll_sb_;
-  std::unique_ptr<TFile> fitOut;
   double* globalObservables_;
   double* nuisanceParameters_;
   double* processNormalizations_;

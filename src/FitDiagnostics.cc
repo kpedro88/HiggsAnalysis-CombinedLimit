@@ -54,6 +54,7 @@ bool        FitDiagnostics::oldNormNames_ = false;
 bool        FitDiagnostics::saveShapes_ = false;
 bool        FitDiagnostics::saveOverallShapes_ = false;
 bool        FitDiagnostics::saveWithUncertainties_ = false;
+bool        FitDiagnostics::saveWorkspace_ = false;
 bool        FitDiagnostics::justFit_ = false;
 bool        FitDiagnostics::skipBOnlyFit_ = false;
 bool        FitDiagnostics::skipSBFit_ = false;
@@ -78,7 +79,7 @@ FitDiagnostics::FitDiagnostics() :
     options_.add_options()
         ("minos",              	boost::program_options::value<std::string>(&minos_)->default_value(minos_), "Compute MINOS errors for: 'none', 'poi', 'all'")
         ("noErrors",  	       	"Don't compute uncertainties on the best fit value. Best if using toys (-t N) to evaluate distributions of results")
-        ("out",                	boost::program_options::value<std::string>(&out_)->default_value(out_), "Directory to put the diagnostics output file in")
+        ("out",                    boost::program_options::value<std::string>(&out_)->default_value(out_), "Directory to put the diagnostics output file in")
         ("plots",              	"Make pre/post-fit RooPlots of 1D distributions of observables and fitted models")
         ("rebinFactor",        	boost::program_options::value<float>(&rebinFactor_)->default_value(rebinFactor_), "Rebin by this factor before plotting (does not affect fitting!)")
         ("signalPdfNames",     	boost::program_options::value<std::string>(&signalPdfNames_)->default_value(signalPdfNames_), "Names of signal pdfs in plots (separated by ',')")
@@ -133,6 +134,7 @@ void FitDiagnostics::applyOptions(const boost::program_options::variables_map &v
     oldNormNames_  = vm.count("oldNormNames");
     saveWithUncertainties_  = vm.count("saveWithUncertainties");
     saveWithUncertsRequested_ = saveWithUncertainties_;
+    saveWorkspace_ = vm.count("saveWorkspace");
     justFit_  = vm.count("justFit");
     skipBOnlyFit_ = vm.count("skipBOnlyFit");
     skipSBFit_ = vm.count("skipSBFit");
@@ -151,15 +153,8 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
 	reuseParams_=false;
   }
 
-  if (!justFit_ && out_ != "none"){
+  if (!justFit_){
 	if (currentToy_ < 1){
-		const bool longName = runtimedef::get(std::string("longName"));
-		std::string fdname(out_+"/fitDiagnostics"+name_);
-		if (longName)
-			fdname += "."+massName_+toyName_+"root";
-		else
-			fdname += ".root";
-		fitOut.reset(TFile::Open(fdname.c_str(), "RECREATE")); 
 		createFitResultTrees(*mc_s,withSystematics,savePredictionsPerToy_);
 	}
   }
@@ -190,7 +185,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
           RooArgSet *norms = new RooArgSet();
           norms->setName("norm_prefit");
           ToySampler sampler(&*nuisancePdf, nuis);
-          getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? fitOut.get() : 0, "_prefit",data);
+          getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? outputFile : 0, "_prefit",data);
           delete norms;
       }
       if (withSystematics)	{
@@ -224,8 +219,8 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
             if (minos_ == "all") minim.minos(*nuis);
             res_prefit = minim.save();
       }
-      if (fitOut.get() && currentToy_ < 1) fitOut->WriteTObject(res_prefit, "nuisances_prefit_res");
-      if (fitOut.get() && currentToy_ < 1) fitOut->WriteTObject(nuis->snapshot(), "nuisances_prefit");
+      if (!justFit_ && currentToy_ < 1) outputFile->WriteTObject(res_prefit, "nuisances_prefit_res");
+      if (!justFit_ && currentToy_ < 1) outputFile->WriteTObject(nuis->snapshot(), "nuisances_prefit");
 
       nuisancePdf.reset();
       globalData.reset();
@@ -236,12 +231,12 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
 	    (*it)->Draw(); 
 	    c1->Print((out_+"/"+(*it)->GetName()+"_prefit.png").c_str());
 	    c1->SetLogy();c1->Print((out_+"/"+(*it)->GetName()+"_prefit_logy.png").c_str()); c1->SetLogy(false);
-	    if (fitOut.get() && currentToy_< 1) fitOut->WriteTObject(*it, (std::string((*it)->GetName())+"_prefit").c_str());
+	    if (!justFit_ && currentToy_< 1) outputFile->WriteTObject(*it, (std::string((*it)->GetName())+"_prefit").c_str());
 	}
       }
       delete res_prefit;
     } else if (nuis) {
-      if (fitOut.get() ) fitOut->WriteTObject(nuis->snapshot(), "nuisances_prefit");
+      if (!justFit_) outputFile->WriteTObject(nuis->snapshot(), "nuisances_prefit");
     }
   // }
   if (t_prefit_) {
@@ -292,8 +287,8 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
 
   if (res_b) { 
       if (verbose > 1) res_b->Print("V");
-      if (fitOut.get()) {
-        if (currentToy_< 1)	fitOut->WriteTObject(res_b,"fit_b");
+      if (!justFit_) {
+        if (currentToy_< 1)	outputFile->WriteTObject(res_b,"fit_b");
         if (withSystematics)	{
           setFitResultTrees(mc_s->GetNuisanceParameters(),nuisanceParameters_);
           setFitResultTrees(mc_s->GetGlobalObservables(),globalObservables_);
@@ -323,7 +318,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
               c1->cd(); (*it)->Draw(); 
               c1->Print((out_+"/"+(*it)->GetName()+"_fit_b.png").c_str());
               c1->SetLogy(); c1->Print((out_+"/"+(*it)->GetName()+"_fit_b_logy.png").c_str()); c1->SetLogy(false);
-              if (fitOut.get() && currentToy_< 1) fitOut->WriteTObject(*it, (std::string((*it)->GetName())+"_fit_b").c_str());
+              if (!justFit_ && currentToy_< 1) outputFile->WriteTObject(*it, (std::string((*it)->GetName())+"_fit_b").c_str());
           }
       }
       if (savePredictionsPerToy_){
@@ -340,8 +335,11 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
           RooArgSet *norms = new RooArgSet();
           norms->setName("norm_fit_b");
           CovarianceReSampler sampler(res_b);
-          getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? fitOut.get() : 0, "_fit_b",data);
+          getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? outputFile : 0, "_fit_b",data);
           delete norms;
+      }
+      if (saveWorkspace_) {
+          w->saveSnapshot("fit_b",utils::returnAllVars(w));
       }
 
       if (makePlots_ && currentToy_<1)  {
@@ -354,7 +352,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
           corr->Draw("COLZ TEXT");
           c1->Print((out_+"/covariance_fit_b.png").c_str());
           c1->SetLeftMargin(0.16);  c1->SetBottomMargin(0.13);
-          if (fitOut.get()) fitOut->WriteTObject(corr, "covariance_fit_b");
+          if (!justFit_) outputFile->WriteTObject(corr, "covariance_fit_b");
       }
 
       //take the limit value from "b-only" when skipping s+b
@@ -416,8 +414,8 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
       limit    = r->getVal();
       limitErr = r->getError();
       if (verbose > 1) res_s->Print("V");
-      if (fitOut.get()){
-	 if (currentToy_<1) fitOut->WriteTObject(res_s, "fit_s");
+      if (!justFit_){
+	 if (currentToy_<1) outputFile->WriteTObject(res_s, "fit_s");
 
 	 if (withSystematics)	{
 	   setFitResultTrees(mc_s->GetNuisanceParameters(),nuisanceParameters_);
@@ -451,7 +449,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
               c1->cd(); (*it)->Draw(); 
               c1->Print((out_+"/"+(*it)->GetName()+"_fit_s.png").c_str());
               c1->SetLogy(); c1->Print((out_+"/"+(*it)->GetName()+"_fit_s_logy.png").c_str()); c1->SetLogy(false);
-              if (fitOut.get() && currentToy_< 1) fitOut->WriteTObject(*it, (std::string((*it)->GetName())+"_fit_s").c_str());
+              if (!justFit_ && currentToy_< 1) outputFile->WriteTObject(*it, (std::string((*it)->GetName())+"_fit_s").c_str());
           }
       }
 
@@ -469,8 +467,11 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
           RooArgSet *norms = new RooArgSet();
           norms->setName("norm_fit_s");
           CovarianceReSampler sampler(res_s);
-          getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? fitOut.get() : 0, "_fit_s",data);
+          getNormalizations(mc_s->GetPdf(), *mc_s->GetObservables(), *norms, sampler, currentToy_<1 ? outputFile : 0, "_fit_s",data);
 	  delete norms;
+      }
+      if (saveWorkspace_) {
+          w->saveSnapshot("fit_s",utils::returnAllVars(w));
       }
 
       if (makePlots_&& currentToy_< 1)  {
@@ -483,7 +484,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
           corr->Draw("COLZ TEXT");
           c1->Print((out_+"/covariance_fit_s.png").c_str());
           c1->SetLeftMargin(0.16);  c1->SetBottomMargin(0.13);
-          if (fitOut.get() ) fitOut->WriteTObject(corr, "covariance_fit_s");
+          if (!justFit_) outputFile->WriteTObject(corr, "covariance_fit_s");
       }
   }  else {
 	fitStatus_=-1;
@@ -543,25 +544,14 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
 
   if (currentToy_==nToys-1 || nToys==0 ) {
         
-        if (fitOut.get()) {	
-		fitOut->cd();
+        if (!justFit_) {
+		outputFile->cd();
 		t_fit_sb_->Write(); t_fit_b_->Write(); t_prefit_->Write();
-		fitOut.release()->Close();
 	}
 
   } 
   bool fitreturn = (res_s!=0);
   delete res_s;
-
-  /*
-  if(saveWorkspace_){
-	  RooWorkspace *ws = new RooWorkspace("FitDiagnosticsResult");
-	  ws->import(*mc_s->GetPdf());
-	  ws->import(data);
-	  std::cout << "Saving pdfs and data to FitDiagnosticsResult.root" << std::endl;
-	  ws->writeToFile("FitDiagnosticsResult.root");
-  }
-  */
 
   return fitreturn;
 }
