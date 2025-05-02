@@ -802,7 +802,7 @@ class ShapeBuilder(ModelBuilder):
                         if ret.InheritsFrom("RooMultiPdf"):
                             for pdf in [ret.getPdf(i) for i in range(ret.getNumPdfs())]:
                                 import_pars(pdf)
-                        else:
+                        elif ret.ClassName() in accessors:
                             import_pars(ret)
                 if self.options.verbose > 2:
                     print("import (%s,%s) -> %s\n" % (finalNames[0], objname, ret.GetName()))
