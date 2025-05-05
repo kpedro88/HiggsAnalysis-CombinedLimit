@@ -64,7 +64,7 @@ bool        FitDiagnostics::customStartingPoint_ = false;
 bool        FitDiagnostics::robustHesse_ = false;
 bool        FitDiagnostics::saveWithUncertsRequested_=false;
 bool        FitDiagnostics::ignoreCovWarning_=false;
-
+bool        FitDiagnostics::usePreFitValue_=true;
 
 FitDiagnostics::FitDiagnostics() :
     FitterAlgoBase("FitDiagnostics specific options"),
@@ -99,6 +99,7 @@ FitDiagnostics::FitDiagnostics() :
         ("initFromBonly",  	"Use the values of the nuisance parameters from the background only fit as the starting point for the s+b fit. Can help fit convergence")
         ("customStartingPoint", "Don't set the first POI to 0 for the background-only fit. Instead if using this option, the parameter will be fixed to its default value, which can be set with the --setParameters option.")
         ("ignoreCovWarning",    "Override the default behaviour of saveWithUncertainties being ignored if the covariance matrix is not accurate.")
+        ("noPreFitValue",  	"do not initialize r to 1 in s+b fit")
    ;
 
     // setup a few defaults
@@ -142,6 +143,7 @@ void FitDiagnostics::applyOptions(const boost::program_options::variables_map &v
     reuseParams_ = vm.count("initFromBonly");
     customStartingPoint_ = vm.count("customStartingPoint");
     ignoreCovWarning_ = vm.count("ignoreCovWarning");
+    usePreFitValue_ = !vm.count("noPreFitValue");
      
     if (justFit_) { out_ = "none"; makePlots_ = false; savePredictionsPerToy_ = false; saveNormalizations_ = false; reuseParams_ = false, skipBOnlyFit_ = true; skipSBFit_ = false; }
 }
@@ -180,7 +182,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
     if (!justFit_ && nuis && globalObs ) {
       std::unique_ptr<RooAbsPdf> nuisancePdf(utils::makeNuisancePdf(*mc_s));
       w->loadSnapshot("toyGenSnapshot");
-      r->setVal(preFitValue_);
+      if(usePreFitValue_) r->setVal(preFitValue_);
       if (saveNormalizations_) {
           RooArgSet *norms = new RooArgSet();
           norms->setName("norm_prefit");
@@ -203,7 +205,7 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
 	   delete norms;
       }
       w->loadSnapshot("clean");
-      r->setVal(preFitValue_);
+      if(usePreFitValue_) r->setVal(preFitValue_);
       RooCategory dummyCat("dummyCat", "");
       RooSimultaneousOpt simNuisancePdf("simNuisancePdf", "", dummyCat);
       simNuisancePdf.addExtraConstraints(((RooProdPdf*)(nuisancePdf.get()))->pdfList());
@@ -384,7 +386,8 @@ bool FitDiagnostics::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, R
   /* S+B fit (Signal parameters free to float ) *************************************************************************************/
 
   if (!reuseParams_) w->loadSnapshot("clean"); // Reset, also ensures nll_prefit is same in call to doFit for b and s+b
-  r->setVal(preFitValue_); r->setConstant(false); 
+  if(usePreFitValue_) r->setVal(preFitValue_);
+  r->setConstant(false);
   if (skipSBFit_) {
     // skip s+b fit
   }
